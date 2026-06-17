@@ -1,5 +1,24 @@
-node_modules
-.env
-.expo
-dist
+# Dependencies
+node_modules/
+
+# Build and Expo outputs
+.expo/
+dist/
+build/
+coverage/
+
+# OS/System files
 .DS_Store
+thumbs.db
+
+# Environment Variables
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+frontend/.env
+backend/.env
+
+*.env
