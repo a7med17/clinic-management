@@ -1,103 +1,179 @@
-# MediCore Pro - Clinic Management System
+# Clinic Management
 
-A production-ready, mobile-only Hospital & Clinic Management System powered by an **Expo React Native App** (fully Expo Go compatible) and a **Node.js Express Backend** connected to **Supabase PostgreSQL**.
+A full-stack clinic management platform built with React Native and TypeScript, featuring role-based workflows, appointment scheduling and scalable healthcare management architecture.
 
 ---
 
-## 🏗️ Architecture
+## Overview
+
+Clinic Management is a cross-platform mobile application designed to streamline day-to-day healthcare operations through a centralized and intuitive experience. The platform aims to simplify patient management, appointment scheduling and clinic administration while maintaining a scalable and maintainable architecture.
+
+The project is being developed with a strong focus on software engineering best practices, including modular design, type safety and clean architecture principles.
+
+---
+
+## Key Objectives
+
+- Improve efficiency in clinic operations
+- Centralize patient and appointment management
+- Provide role-based workflows for healthcare staff
+- Deliver a responsive and intuitive mobile experience
+- Build a scalable foundation for future healthcare features
+
+---
+
+## Features
+
+### Authentication & Authorization
+
+- Secure user authentication
+- Session management
+- Protected screens
+- Role-based access control
+
+### Patient Management
+
+- Patient registration
+- Patient profiles
+- Medical history tracking
+- Contact information management
+
+### Appointment Scheduling
+
+- Create appointments
+- Reschedule appointments
+- Cancel appointments
+- Track appointment status
+
+### Doctor Management
+
+- Doctor profiles
+- Specialty management
+- Availability tracking
+- Appointment assignments
+
+### Dashboard
+
+- Operational overview
+- Appointment summaries
+- Patient statistics
+- Quick access to key workflows
+
+### Medical Records
+
+- Digital patient records
+- Consultation history
+- Treatment tracking
+- Clinical documentation
+
+---
+
+## Technical Highlights
+
+- Cross-platform mobile development
+- Type-safe codebase with TypeScript
+- Component-based architecture
+- API-driven data management
+- Reusable UI components
+- Scalable project structure
+- Modern React Hooks patterns
+- Separation of business logic and presentation layers
+- Maintainable and extensible codebase
+
+---
+
+## Tech Stack
+
+### Mobile Development
+
+- React Native
+- Expo
+- TypeScript
+
+### Navigation
+
+- React Navigation
+
+### Networking
+
+- Axios
+- REST APIs
+
+### Backend Integration
+
+- Node.js
+- Express.js
+- PostgreSQL
+
+### Development Tools
+
+- ESLint
+- Git
+- GitHub
+
+---
+
+## Architecture
+
+The application follows a modular architecture to improve maintainability and scalability.
 
 ```text
-Clinic-management-system/
-├── backend/                  # Node.js Express MVC API Server
-│   ├── config/               # Database and Supabase Client Configurations
-│   ├── controllers/          # Request controller logic (auth, patient, appointments, billing)
-│   ├── middleware/           # Express security, auth, validation, and role middlewares
-│   ├── routes/               # API route definitions
-│   ├── services/             # Operations services layers (placeholders)
-│   ├── utils/                # JWT helpers and JSON API response structures
-│   ├── server.js             # Main server boot configuration
-│   └── package.json
-│
-└── frontend/                 # Expo React Native TypeScript Mobile App
-    ├── src/
-    │   ├── navigation/       # React Navigation setup and Custom Floating Bottom Tab Bar
-    │   ├── screens/          # Screen components (auth, admin, doctor, patient, pharmacist, lab)
-    │   ├── services/         # Axios API client and local session storage
-    │   └── assets/           # Images, logos, and fonts
-    ├── App.tsx               # Main entry point mounting AppNavigator
-    └── package.json
+src/
+├── components/
+├── screens/
+├── navigation/
+├── services/
+├── hooks/
+├── store/
+├── types/
+├── utils/
+└── assets/
 ```
 
----
+### Design Principles
 
-## ⚡ Setup & Launch Instructions
+#### Scalability
 
-Ensure you have [Node.js (v18+)](https://nodejs.org/) installed on your machine.
+Features are organized into independent modules that can grow without affecting other parts of the application.
 
-### 1. Backend Server Setup
+#### Maintainability
 
-Navigate to the `backend` folder, install packages, and boot the server:
+Reusable components and clear separation of concerns improve code quality and long-term development.
 
-```bash
-cd backend
-npm install
-npm run dev
-```
+#### Reliability
 
-* **Environment Configuration**: A `.env` file has been prepared in the `backend` folder. Adjust keys as needed:
-  ```env
-  PORT=5000
-  SUPABASE_URL=https://your-project.supabase.co
-  SUPABASE_ANON_KEY=your-anon-key
-  JWT_SECRET=super_secret_jwt_key_clinic_management_123456
-  ```
-* **Database Migrations**: The PostgreSQL DDL schema script is ready at `backend/config/schema.sql`. You can execute it directly inside the Supabase SQL Editor.
+TypeScript is used throughout the application to reduce runtime errors and improve developer productivity.
+
+#### User Experience
+
+The interface is designed to provide efficient workflows for healthcare professionals on mobile devices.
 
 ---
 
-### 2. Frontend Mobile App Setup
+## Roadmap
 
-Open a new terminal window, navigate to the `frontend` folder, install packages, and boot the Expo development server:
-
-```bash
-cd frontend
-npm install
-npx expo start
-```
-
-* **Environment Configuration**: A `.env` file has been prepared in the `frontend` folder:
-  ```env
-  EXPO_PUBLIC_API_URL=http://YOUR_LOCAL_IP:5000/api
-  EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-  EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-  ```
-  > [!IMPORTANT]
-  > Update `YOUR_LOCAL_IP` with your developer workstation's local IP address (e.g., `192.168.1.15`) to allow mobile devices running Expo Go to connect to the backend server.
-* **Launch in Expo Go**: Scan the QR code printed in the terminal using the Expo Go application on iOS or Android.
+- [ ] Authentication & authorization
+- [ ] Patient management module
+- [ ] Doctor management module
+- [ ] Appointment scheduling system
+- [ ] Medical records management
+- [ ] Push notifications
+- [ ] Analytics dashboard
+- [ ] Offline data synchronization
+- [ ] Reporting system
+- [ ] Automated testing
 
 ---
 
-## 🔑 Demo Account Credentials (One-Tap Fill)
+## Skills Demonstrated
 
-The login screen features interactive badges to pre-populate these credentials. If Supabase is unconfigured, the system automatically authenticates local sessions to facilitate instant demo reviews.
-
-| Role | Email | Password | Logged-in Name | Dashboard Flow |
-|---|---|---|---|---|
-| **Admin** | `admin@medicore.com` | `password123` | Chief Administrator | Admin Control Panel |
-| **Doctor** | `doctor@medicore.com` | `password123` | Dr. Sarah Jenkins | Doctor Dashboard |
-| **Patient** | `patient@medicore.com` | `password123` | Jane Mary Doe | Patient Portal |
-| **Receptionist** | `receptionist@medicore.com` | `password123` | Alice Smith | Reception Panel |
-| **Pharmacist** | `pharmacist@medicore.com` | `password123` | John Doe | Pharmacy Panel |
-| **Laboratory Staff** | `labstaff@medicore.com` | `password123` | Robert Johnson | Laboratory Panel |
-
----
-
-## 🗄️ Database Tables Schema (`schema.sql`)
-
-The system comprises the following tables:
-1. `users`: Credentials, password bcrypt hashes, and system roles.
-2. `patients`: Records relating to patient details, gender, DOB, blood type, and address.
-3. `doctors`: Specializations and clinician records.
-4. `appointments`: Consultations, statuses, notes, and booking dates.
-5. `invoices`: Patient billings and invoicing states.
-6. `payments`: Payment transaction amounts, timestamps, and settlement types (Cash, Card, Insurance, Bank Transfer).
+- React Native Development
+- TypeScript
+- Mobile Application Architecture
+- State Management
+- API Integration
+- Authentication & Authorization
+- Component-Driven Development
+- Software Engineering Best Practices
+- Scalable System Design
+- Version Control with Git
