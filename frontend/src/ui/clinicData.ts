@@ -1,5 +1,7 @@
+// Shared role vocabulary plus static presentation data for screens that do not yet have live API backing.
 export type Role = 'Admin' | 'Doctor' | 'Patient' | 'Receptionist' | 'Pharmacist' | 'Laboratory Staff';
 
+// Fallback profile display values used until the authenticated profile has loaded.
 export const roleProfiles: Record<Role, { name: string; title: string; email: string; phone: string; department: string }> = {
   Admin: {
     name: 'Nadia Rahman',

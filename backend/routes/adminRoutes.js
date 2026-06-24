@@ -1,3 +1,4 @@
+// Administrative user management and organization-wide dashboard endpoints.
 const express = require('express');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
@@ -13,6 +14,7 @@ const {
 
 const router = express.Router();
 
+// Every route in this module requires a live account with the Admin role.
 router.use(authMiddleware);
 router.use(roleMiddleware(['Admin']));
 

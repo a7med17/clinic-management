@@ -1,3 +1,4 @@
+// Staff-facing doctor directory and schedule maintenance routes.
 const express = require('express');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
@@ -17,6 +18,7 @@ const {
 const router = express.Router();
 
 // All doctor routes require authentication
+// The module is protected globally; write operations below are restricted to Admin/Receptionist.
 router.use(authMiddleware);
 
 /**

@@ -1,3 +1,4 @@
+// Pharmacy inventory CRUD with stock and expiry filters for day-to-day dispensing decisions.
 const { successResponse, errorResponse } = require('../utils/response');
 const { supabase } = require('../config/supabase');
 

@@ -1,3 +1,4 @@
+// Placeholder insurance-claims screen; claims processing has no backing workflow yet.
 import React from 'react';
 import { StyleSheet, View, Text, SafeAreaView } from 'react-native';
 

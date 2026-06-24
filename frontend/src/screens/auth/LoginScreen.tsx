@@ -1,3 +1,4 @@
+// Public sign-in screen. The auth service owns storage; this component owns form feedback and navigation.
 import React, { useState } from 'react';
 import {
   View,
@@ -33,6 +34,7 @@ export default function LoginScreen({ navigation }: any) {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
+  // Validate locally for quick feedback, then reset history so a logged-in user cannot return to Login.
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       setError('Please enter both email and password');

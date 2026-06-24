@@ -1,7 +1,9 @@
+// Reusable visual primitives for the phase-one role screens. They standardize spacing, color, and interaction states.
 import React from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+// Semantic color names keep role screens from scattering raw design tokens.
 export const colors = {
   bg: '#f6f8fb',
   surface: '#ffffff',
@@ -29,6 +31,7 @@ export function Content({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Consistent screen heading with an optional identity marker and notification shortcut.
 export function Header({
   title,
   subtitle,
@@ -113,6 +116,7 @@ export function ActionCard({
   );
 }
 
+// Generic, pressable record row; a status renders as a badge while ordinary rows show a disclosure affordance.
 export function ListRow({
   icon,
   title,
@@ -162,6 +166,7 @@ export function SearchBar({ placeholder = 'Search patient by name or ID...' }: {
   );
 }
 
+// Lightweight visual trend card used for summary reporting; bar values are illustrative, not live chart data.
 export function ChartCard({ title, value, meta, accent }: { title: string; value: string; meta: string; accent: string }) {
   return (
     <View style={styles.chartCard}>

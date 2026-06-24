@@ -1,3 +1,4 @@
+// Placeholder prescriptions screen; prescription fulfillment has not been connected to a backend workflow.
 import React from 'react';
 import { StyleSheet, View, Text, SafeAreaView } from 'react-native';
 

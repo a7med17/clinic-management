@@ -1,3 +1,4 @@
+// Reusable legacy dashboard shell used by role wrapper screens; it currently displays local demonstration content.
 import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
@@ -54,6 +55,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     navigation.replace('Login');
   };
 
+  // Adapt the title from the cached role without duplicating one screen per role.
   const getUserHeaderTitle = () => {
     if (!user) return 'Clinic Dashboard';
     switch (user.role) {

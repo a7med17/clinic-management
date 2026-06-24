@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+// Development launcher: frees Metro's default port before starting Expo with a clean LAN bundle.
+
 const { execSync } = require('child_process');
 const os = require('os');
 

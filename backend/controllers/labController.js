@@ -1,5 +1,20 @@
+// Laboratory test CRUD. Read queries are scoped to the requesting patient or doctor where applicable.
 const { successResponse, errorResponse } = require('../utils/response');
 const { supabase } = require('../config/supabase');
+
+const LAB_STATUSES = ['Pending', 'Processing', 'Completed', 'Cancelled'];
+
+const getLinkedRecordId = async (table, userId) => {
+  const { data } = await supabase.from(table).select('id').eq('user_id', userId).maybeSingle();
+  return data?.id || null;
+};
+
+const canAccessLabTest = async (user, labTest) => {
+  if (user.role === 'Admin' || user.role === 'Laboratory Staff') return true;
+  if (user.role === 'Patient') return labTest.patient_id === await getLinkedRecordId('patients', user.id);
+  if (user.role === 'Doctor') return labTest.doctor_id === await getLinkedRecordId('doctors', user.id);
+  return false;
+};
 
 /**
  * GET /api/lab-tests
@@ -97,6 +112,7 @@ const getLabTestById = async (req, res, next) => {
     if (error || !labTest) {
       return errorResponse(res, 'Lab test not found.', 404);
     }
+    if (!await canAccessLabTest(req.user, labTest)) return errorResponse(res, 'Lab test not found.', 404);
 
     return successResponse(res, 'Lab test retrieved successfully', labTest);
   } catch (error) {
@@ -166,9 +182,16 @@ const updateLabTest = async (req, res, next) => {
     const { status, result, test_name } = req.body;
     const updateData = {};
 
-    if (test_name !== undefined) updateData.test_name = test_name.trim();
-    if (status !== undefined) updateData.status = status;
+    if (test_name !== undefined) {
+      if (typeof test_name !== 'string' || !test_name.trim()) return errorResponse(res, 'test_name must be a non-empty string.', 400);
+      updateData.test_name = test_name.trim();
+    }
+    if (status !== undefined) {
+      if (!LAB_STATUSES.includes(status)) return errorResponse(res, `Invalid status. Must be one of: ${LAB_STATUSES.join(', ')}`, 400);
+      updateData.status = status;
+    }
     if (result !== undefined) updateData.result = result;
+    if (!Object.keys(updateData).length) return errorResponse(res, 'At least one valid lab-test field is required.', 400);
 
     const { data: updatedLabTest, error } = await supabase
       .from('lab_tests')

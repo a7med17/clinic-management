@@ -1,3 +1,4 @@
+// Legacy Admin-only user CRUD. The active frontend uses adminController's role portal endpoints.
 const bcrypt = require('bcryptjs');
 const { successResponse, errorResponse } = require('../utils/response');
 const { supabase } = require('../config/supabase');

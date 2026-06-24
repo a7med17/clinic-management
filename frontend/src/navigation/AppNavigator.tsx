@@ -1,3 +1,4 @@
+// Navigation composition: public authentication screens, role-specific tabs, and shared detail screens.
 import React from 'react';
 import { Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -16,9 +17,21 @@ import {
   AppSettingsScreen,
   ChangePasswordScreen,
   HelpSupportScreen,
+  DoctorAppointmentDetailScreen,
+  DoctorLabTestsScreen,
+  DoctorPatientDetailScreen,
   NotificationSettingsScreen,
+  PatientAppointmentDetailScreen,
+  PatientBookAppointmentScreen,
+  PatientLabResultsScreen,
   ProfileInformationScreen,
   ProfileScreen,
+  ReceptionAppointmentDetailScreen,
+  ReceptionAppointmentFormScreen,
+  ReceptionInvoiceFormScreen,
+  ReceptionInvoicePaymentScreen,
+  ReceptionPatientFormScreen,
+  ReceptionWaitingRoomScreen,
   ReportsScreen,
   RoleDashboardScreen,
   RoleListScreen,
@@ -29,6 +42,7 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 const { width } = Dimensions.get('window');
 
+// Each role declares only the tabs it is allowed to see; screens receive the signed-in user as route params.
 type TabConfig = {
   name: string;
   label: string;
@@ -36,6 +50,7 @@ type TabConfig = {
   component: React.ComponentType<any>;
 };
 
+// Navigation visibility is a UI concern; the backend remains the source of authorization enforcement.
 const ROLE_TABS: Record<Role, TabConfig[]> = {
   Admin: [
     { name: 'Dashboard', label: 'Dashboard', icon: 'grid-outline', component: RoleDashboardScreen },
@@ -77,6 +92,7 @@ const ROLE_TABS: Record<Role, TabConfig[]> = {
   ],
 };
 
+// Custom tab bar mirrors React Navigation's tabPress event so listeners/preventDefault continue to work.
 function CustomTabBar({ state, descriptors, navigation }: any) {
   return (
     <View style={styles.tabShell}>
@@ -105,6 +121,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   );
 }
 
+// Resolve the authenticated role once, then render its compact tab set with the same user context.
 function MainTabNavigator({ route }: any) {
   const user = route.params?.user;
   const role: Role = user?.role || 'Patient';
@@ -125,13 +142,14 @@ function MainTabNavigator({ route }: any) {
   );
 }
 
-export default function AppNavigator() {
+// Stack screens hold flows that drill beyond a tab; initialUser decides whether boot lands on Login or MainTabs.
+export default function AppNavigator({ initialUser = null }: { initialUser?: any }) {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
+      <Stack.Navigator initialRouteName={initialUser ? 'MainTabs' : 'Login'} screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+        <Stack.Screen name="MainTabs" component={MainTabNavigator} initialParams={{ user: initialUser }} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="AdminUsers" component={AdminUsersScreen} />
         <Stack.Screen name="ActiveStaff" component={ActiveStaffScreen} />
@@ -140,6 +158,18 @@ export default function AppNavigator() {
         <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
         <Stack.Screen name="AppSettings" component={AppSettingsScreen} />
         <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
+        <Stack.Screen name="DoctorAppointmentDetail" component={DoctorAppointmentDetailScreen} />
+        <Stack.Screen name="DoctorPatientDetail" component={DoctorPatientDetailScreen} />
+        <Stack.Screen name="DoctorLabTests" component={DoctorLabTestsScreen} />
+        <Stack.Screen name="PatientAppointmentDetail" component={PatientAppointmentDetailScreen} />
+        <Stack.Screen name="PatientBookAppointment" component={PatientBookAppointmentScreen} />
+        <Stack.Screen name="PatientLabResults" component={PatientLabResultsScreen} />
+        <Stack.Screen name="ReceptionPatientForm" component={ReceptionPatientFormScreen} />
+        <Stack.Screen name="ReceptionAppointmentForm" component={ReceptionAppointmentFormScreen} />
+        <Stack.Screen name="ReceptionAppointmentDetail" component={ReceptionAppointmentDetailScreen} />
+        <Stack.Screen name="ReceptionWaitingRoom" component={ReceptionWaitingRoomScreen} />
+        <Stack.Screen name="ReceptionInvoiceForm" component={ReceptionInvoiceFormScreen} />
+        <Stack.Screen name="ReceptionInvoicePayment" component={ReceptionInvoicePaymentScreen} />
         <Stack.Screen name="ModuleDetail" component={ModuleDetailScreen} />
       </Stack.Navigator>
     </NavigationContainer>

@@ -1,3 +1,4 @@
+// Public account entry points plus authenticated self-service profile/password endpoints.
 const express = require('express');
 const { body } = require('express-validator');
 const { login, register, getCurrentUser, changePassword } = require('../controllers/authController');
@@ -44,6 +45,7 @@ router.post(
  * @desc Retrieve current logged-in user profile
  * @access Private
  */
+// These endpoints rely on the current JWT; no role restriction is needed because each user edits only themself.
 router.get('/me', authMiddleware, getCurrentUser);
 router.patch('/change-password', authMiddleware, changePassword);
 

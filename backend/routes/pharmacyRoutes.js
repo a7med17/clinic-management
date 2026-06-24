@@ -1,3 +1,4 @@
+// Medicine inventory routes; pharmacists own day-to-day writes while admins retain oversight.
 const express = require('express');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
@@ -12,6 +13,7 @@ const {
 const router = express.Router();
 
 // All pharmacy routes require authentication
+// Authentication is mandatory before inventory data is exposed.
 router.use(authMiddleware);
 
 /**

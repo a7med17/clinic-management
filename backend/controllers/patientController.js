@@ -1,3 +1,4 @@
+// Shared patient directory CRUD. Patient callers are restricted to their own linked profile.
 const { successResponse, errorResponse } = require('../utils/response');
 const { supabase } = require('../config/supabase');
 

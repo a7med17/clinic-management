@@ -1,3 +1,4 @@
+// Placeholder secure-messaging screen; no real-time or encrypted messaging service is connected yet.
 import React from 'react';
 import { StyleSheet, View, Text, SafeAreaView } from 'react-native';
 

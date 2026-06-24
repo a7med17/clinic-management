@@ -1,7 +1,7 @@
 const { errorResponse } = require('../utils/response');
 
 /**
- * Middleware to enforce role-based access controls
+ * Factory for route-level role guards. It runs after authMiddleware, which supplies req.user.
  * @param {string[]} allowedRoles - List of authorized roles
  */
 const roleMiddleware = (allowedRoles) => {

@@ -1,3 +1,4 @@
+// Shared appointment resource routes. Controller-level checks further restrict ownership where needed.
 const express = require('express');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
@@ -12,7 +13,9 @@ const {
 const router = express.Router();
 
 // All appointment routes require authentication
+// The outer guard admits clinical roles; write routes below narrow permissions further.
 router.use(authMiddleware);
+router.use(roleMiddleware(['Admin', 'Doctor', 'Patient', 'Receptionist']));
 
 /**
  * @route   GET /api/appointments

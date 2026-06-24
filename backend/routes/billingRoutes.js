@@ -1,3 +1,4 @@
+// Invoice, line-item, and payment routes. Mutations are limited to administrative/front-desk roles.
 const express = require('express');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
@@ -16,6 +17,7 @@ const {
 const router = express.Router();
 
 // All billing routes require authentication
+// Billing data is protected for every role, with finer mutation rules declared per endpoint.
 router.use(authMiddleware);
 
 // ---------- INVOICES ----------
@@ -25,14 +27,14 @@ router.use(authMiddleware);
  * @desc    List all invoices (Patients see own only)
  * @access  Admin, Receptionist, Doctor (read), Patient (own)
  */
-router.get('/invoices', getAllInvoices);
+router.get('/invoices', roleMiddleware(['Admin', 'Receptionist', 'Patient']), getAllInvoices);
 
 /**
  * @route   GET /api/billing/invoices/:id
  * @desc    Get invoice with items and payments
  * @access  Admin, Receptionist, Doctor, Patient (own)
  */
-router.get('/invoices/:id', getInvoiceById);
+router.get('/invoices/:id', roleMiddleware(['Admin', 'Receptionist', 'Patient']), getInvoiceById);
 
 /**
  * @route   POST /api/billing/invoices
@@ -78,7 +80,7 @@ router.delete('/invoices/:invoiceId/items/:itemId', roleMiddleware(['Admin', 'Re
  * @desc    Get all payments for an invoice
  * @access  Admin, Receptionist, Patient (own)
  */
-router.get('/invoices/:invoiceId/payments', getPayments);
+router.get('/invoices/:invoiceId/payments', roleMiddleware(['Admin', 'Receptionist', 'Patient']), getPayments);
 
 /**
  * @route   POST /api/billing/invoices/:invoiceId/payments

@@ -1,3 +1,4 @@
+// Doctor availability slots used to validate bookings in reception and patient workflows.
 const { successResponse, errorResponse } = require('../utils/response');
 const { supabase } = require('../config/supabase');
 
@@ -52,7 +53,7 @@ const setSchedule = async (req, res, next) => {
       return errorResponse(res, 'start_time must be before end_time.', 400);
     }
 
-    // Verify doctor exists
+    // Reject orphaned schedules before the foreign-key error reaches the caller.
     const { data: doctor } = await supabase
       .from('doctors')
       .select('id')

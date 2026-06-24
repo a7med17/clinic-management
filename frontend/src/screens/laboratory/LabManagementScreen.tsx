@@ -1,3 +1,4 @@
+// Placeholder laboratory module. The active lab workflow lives in RoleScreens until this becomes a dedicated feature.
 import React from 'react';
 import { StyleSheet, View, Text, SafeAreaView } from 'react-native';
 

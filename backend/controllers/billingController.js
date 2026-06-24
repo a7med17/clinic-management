@@ -1,7 +1,17 @@
+// Financial record controller for invoices, line items, and payments; routes supply mutation permissions.
 const { successResponse, errorResponse } = require('../utils/response');
 const { supabase } = require('../config/supabase');
 
-// ---------- INVOICES ----------
+// Invoice reads include the patient/appointment context required by the front desk and patient views.
+const getPatientIdForUser = async (userId) => {
+  const { data } = await supabase.from('patients').select('id').eq('user_id', userId).maybeSingle();
+  return data?.id || null;
+};
+
+const canAccessInvoice = async (user, invoice) => {
+  if (user.role !== 'Patient') return true;
+  return invoice.patient_id === await getPatientIdForUser(user.id);
+};
 
 /**
  * GET /api/billing/invoices
@@ -32,14 +42,9 @@ const getAllInvoices = async (req, res, next) => {
 
     // Patients see only their own invoices
     if (req.user.role === 'Patient') {
-      const { data: patientRecord } = await supabase
-        .from('patients')
-        .select('id')
-        .eq('user_id', req.user.id)
-        .single();
-
-      if (patientRecord) {
-        query = query.eq('patient_id', patientRecord.id);
+      const patientId = await getPatientIdForUser(req.user.id);
+      if (patientId) {
+        query = query.eq('patient_id', patientId);
       } else {
         return successResponse(res, 'No invoices found', []);
       }
@@ -81,24 +86,18 @@ const getInvoiceById = async (req, res, next) => {
     if (error || !invoice) {
       return errorResponse(res, 'Invoice not found.', 404);
     }
+    if (!await canAccessInvoice(req.user, invoice)) return errorResponse(res, 'Invoice not found.', 404);
 
-    // Fetch items
-    const { data: items } = await supabase
-      .from('invoice_items')
-      .select('*')
-      .eq('invoice_id', invoice.id);
-
-    // Fetch payments
-    const { data: payments } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('invoice_id', invoice.id)
-      .order('payment_date', { ascending: false });
+    const [itemsResult, paymentsResult] = await Promise.all([
+      supabase.from('invoice_items').select('*').eq('invoice_id', invoice.id),
+      supabase.from('payments').select('*').eq('invoice_id', invoice.id).order('payment_date', { ascending: false })
+    ]);
+    if (itemsResult.error || paymentsResult.error) return errorResponse(res, 'Failed to retrieve invoice details.', 500);
 
     return successResponse(res, 'Invoice retrieved successfully', {
       ...invoice,
-      items: items || [],
-      payments: payments || []
+      items: itemsResult.data || [],
+      payments: paymentsResult.data || []
     });
   } catch (error) {
     next(error);
@@ -458,6 +457,15 @@ const getPayments = async (req, res, next) => {
   try {
     if (!supabase) {
       return errorResponse(res, 'Database is not configured.', 503);
+    }
+
+    const { data: invoice, error: invoiceError } = await supabase
+      .from('invoices')
+      .select('id, patient_id')
+      .eq('id', req.params.invoiceId)
+      .single();
+    if (invoiceError || !invoice || !await canAccessInvoice(req.user, invoice)) {
+      return errorResponse(res, 'Invoice not found.', 404);
     }
 
     const { data, error } = await supabase

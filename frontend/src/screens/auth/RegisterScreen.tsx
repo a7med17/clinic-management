@@ -1,3 +1,4 @@
+// Public registration screen with local validation, animated feedback, and a direct account-creation request.
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -12,8 +13,7 @@ import {
   Animated,
   StatusBar,
 } from 'react-native';
-import axios from 'axios';
-import { API_URL } from '../../services/api';
+import { register } from '../../services/authService';
 
 const COLORS = {
   primary: '#0A6EBD',
@@ -78,6 +78,7 @@ export default function RegisterScreen({ navigation }: any) {
     }
   }, [error]);
 
+  // Reject incomplete or mismatched credentials before making the registration request.
   const handleRegister = async () => {
     console.log('[Register] Create Account clicked');
 
@@ -100,32 +101,17 @@ export default function RegisterScreen({ navigation }: any) {
     setLoading(true);
     setError('');
     try {
-      const apiUrl = `${API_URL}/auth/register`;
-      console.log('[Register] Sending request to:', apiUrl);
+      const result = await register(payload);
 
-      const response = await axios.post(apiUrl, payload);
-
-      console.log('[Register] Response status:', response.status);
-      console.log('[Register] Response data:', JSON.stringify(response.data));
-
-      if (response.data.success) {
+      if (result.success) {
         console.log('[Register] Registration successful, navigating to Login');
         navigation.navigate('Login');
       } else {
-        console.log('[Register] Response success=false:', response.data.message);
-        setError(response.data.message || 'Registration returned unsuccessful response');
+        console.log('[Register] Response success=false:', result.message);
+        setError(result.message || 'Registration returned unsuccessful response');
       }
     } catch (err: any) {
-      console.error('[Register] Registration error:', err);
-      console.error('[Register] Error response:', err.response?.status, JSON.stringify(err.response?.data));
-      console.error('[Register] Error message:', err.message);
-
-      const errorMessage =
-        err.response?.data?.message ||
-        err.message ||
-        JSON.stringify(err);
-
-      setError(errorMessage);
+      setError(err.message || 'Unable to create the account.');
     } finally {
       setLoading(false);
     }

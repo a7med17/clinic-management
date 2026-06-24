@@ -1,3 +1,4 @@
+// Admin portal API adapter and the response types consumed by role-management screens.
 import api from './api';
 import { Role } from '../ui/clinicData';
 
@@ -36,6 +37,7 @@ export interface ActiveStaff {
   availability: string;
 }
 
+// Backend responses use { success, message, data }; components only need the payload itself.
 const unwrap = <T>(response: { data: { data: T } }) => response.data.data;
 
 export const getAdminDashboardSummary = async (): Promise<AdminDashboardSummary> => {

@@ -1,3 +1,4 @@
+// Doctor directory CRUD and schedule-aware profile lookups used during appointment booking.
 const { successResponse, errorResponse } = require('../utils/response');
 const { supabase } = require('../config/supabase');
 

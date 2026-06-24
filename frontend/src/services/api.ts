@@ -1,7 +1,9 @@
+// Shared HTTP client. It discovers the Expo development host and injects the secure session token.
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import * as SecureStore from 'expo-secure-store';
 
+// Expo Go runs on a device, so localhost must be replaced with the active Metro host in development.
 const getExpoHostApiUrl = () => {
   const constants = Constants as any;
   const hostUri =
@@ -34,12 +36,12 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config) => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await SecureStore.getItemAsync('auth_token');
       if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (error) {
-      console.warn('[API Service] Error reading token from AsyncStorage:', error);
+      console.warn('[API Service] Error reading secure authentication token:', error);
     }
     return config;
   },
@@ -48,6 +50,7 @@ api.interceptors.request.use(
   }
 );
 
+// Preserve Axios errors for feature services while logging network-only failures with request context.
 api.interceptors.response.use(
   (response) => response,
   (error) => {

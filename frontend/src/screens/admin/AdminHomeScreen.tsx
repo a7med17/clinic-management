@@ -1,3 +1,4 @@
+// Legacy standalone admin overview. The active navigator uses RoleScreens' live AdminDashboard instead.
 import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
@@ -14,6 +15,7 @@ import { getCurrentUser, logout } from '../../services/authService';
 export default function AdminHomeScreen({ navigation }: { navigation: any }) {
   const [user, setUser] = useState<any>(null);
 
+  // Read the locally cached identity for display only; live operational counts belong to the portal dashboard.
   useEffect(() => {
     const fetchUser = async () => {
       const activeUser = await getCurrentUser();

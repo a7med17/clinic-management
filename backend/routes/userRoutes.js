@@ -1,3 +1,4 @@
+// Legacy administrative user CRUD route group; adminRoutes is the frontend-facing management API.
 const express = require('express');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
@@ -12,6 +13,7 @@ const {
 const router = express.Router();
 
 // All user management routes require Admin role
+// Keep this legacy surface admin-only to avoid widening access to account data.
 router.use(authMiddleware);
 router.use(roleMiddleware(['Admin']));
 

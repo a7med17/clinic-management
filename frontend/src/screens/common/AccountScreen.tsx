@@ -1,3 +1,4 @@
+// Legacy account overview driven by cached user data; the active app uses the phase-one ProfileScreen flow.
 import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
@@ -27,6 +28,7 @@ export default function AccountScreen({ navigation }: { navigation: any }) {
     navigation.replace('Login');
   };
 
+  // Keep the page title role-aware while reusing a single account layout.
   const getHeaderTitle = () => {
     if (!user) return 'Account';
     switch (user.role) {

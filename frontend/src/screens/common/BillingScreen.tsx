@@ -1,3 +1,4 @@
+// Legacy billing overview. The active receptionist flow uses the role-specific invoice and payment screens.
 import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
@@ -20,7 +21,7 @@ interface Invoice {
   details: string;
   items: string;
   total_amount: number;
-  status: 'Paid' | 'Unpaid' | 'Partially Paid';
+  status: 'Paid' | 'Unpaid' | 'Partially Paid' | 'Refunded';
   due_date: string;
 }
 
@@ -38,12 +39,22 @@ export default function BillingScreen({ navigation }: { navigation: any }) {
     fetchInvoices();
   }, []);
 
+  // Preserve an offline preview by loading local examples only when the billing request fails.
   const fetchInvoices = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/billing');
+      const response = await api.get('/billing/invoices');
       if (response.data && response.data.success) {
-        setInvoices(response.data.data);
+        setInvoices((response.data.data || []).map((invoice: any) => ({
+          id: invoice.id,
+          invoice_number: invoice.invoice_number,
+          patient_name: invoice.patients?.name || 'Unknown patient',
+          details: invoice.appointments?.appointment_date ? `Appointment: ${invoice.appointments.appointment_date}` : 'Clinic services',
+          items: 'See invoice details',
+          total_amount: Number(invoice.total_amount || 0),
+          status: invoice.status,
+          due_date: invoice.due_date,
+        })));
       }
     } catch (error) {
       console.warn('[Billing Screen] Failed to fetch invoices from API. Using local fallbacks.');

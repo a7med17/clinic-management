@@ -1,3 +1,4 @@
+// Laboratory test routes; result updates are intentionally limited to laboratory staff and admins.
 const express = require('express');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
@@ -12,6 +13,7 @@ const {
 const router = express.Router();
 
 // All lab routes require authentication
+// Authentication is mandatory before clinical test data is exposed.
 router.use(authMiddleware);
 
 /**
@@ -19,14 +21,14 @@ router.use(authMiddleware);
  * @desc    List lab tests (scoped by role)
  * @access  Admin, Laboratory Staff, Doctor (own), Patient (own)
  */
-router.get('/', getAllLabTests);
+router.get('/', roleMiddleware(['Admin', 'Laboratory Staff', 'Doctor', 'Patient']), getAllLabTests);
 
 /**
  * @route   GET /api/lab-tests/:id
  * @desc    Get lab test by ID
  * @access  Admin, Laboratory Staff, Doctor, Patient
  */
-router.get('/:id', getLabTestById);
+router.get('/:id', roleMiddleware(['Admin', 'Laboratory Staff', 'Doctor', 'Patient']), getLabTestById);
 
 /**
  * @route   POST /api/lab-tests

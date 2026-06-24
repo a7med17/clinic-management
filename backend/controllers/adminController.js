@@ -1,10 +1,13 @@
+// Admin-only operational APIs: dashboard metrics, user lifecycle management, and staff availability.
 const bcrypt = require('bcryptjs');
 const { successResponse, errorResponse } = require('../utils/response');
 const { supabase } = require('../config/supabase');
 
+// Keep role values aligned with the users.role database constraint and frontend Role union.
 const ROLES = ['Admin', 'Doctor', 'Patient', 'Receptionist', 'Pharmacist', 'Laboratory Staff'];
 const STAFF_ROLES = ['Doctor', 'Receptionist', 'Pharmacist', 'Laboratory Staff'];
 
+// Reused inclusive/exclusive date range prevents overlap between adjacent daily reports.
 const getTodayBounds = () => {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
@@ -13,6 +16,7 @@ const getTodayBounds = () => {
   return { start: start.toISOString(), end: end.toISOString() };
 };
 
+// Controllers use this guard to fail predictably when Supabase was not configured at startup.
 const ensureDb = (res) => {
   if (!supabase) {
     errorResponse(res, 'Database is not configured.', 503);
@@ -21,6 +25,7 @@ const ensureDb = (res) => {
   return true;
 };
 
+// Use count-only queries for dashboard cards so aggregate data is not transferred unnecessarily.
 const countRows = async (table, applyFilters = (query) => query) => {
   const query = applyFilters(supabase.from(table).select('id', { count: 'exact', head: true }));
   const { count, error } = await query;
@@ -29,7 +34,11 @@ const countRows = async (table, applyFilters = (query) => query) => {
 };
 
 const hashPassword = async (password) => bcrypt.hash(password, await bcrypt.genSalt(12));
+const normalizeSearch = (value) => typeof value === 'string'
+  ? value.trim().replace(/[(),]/g, '').slice(0, 100)
+  : '';
 
+// Fetch independent dashboard aggregates concurrently to keep the admin landing screen responsive.
 const getDashboardMetrics = async (req, res, next) => {
   try {
     if (!ensureDb(res)) return;
@@ -73,7 +82,8 @@ const getUsers = async (req, res, next) => {
   try {
     if (!ensureDb(res)) return;
 
-    const { role, status, search } = req.query;
+    const { role, status } = req.query;
+    const search = normalizeSearch(req.query.search);
     let query = supabase
       .from('users')
       .select('id, email, name, role, is_active, created_at, updated_at')
@@ -92,6 +102,7 @@ const getUsers = async (req, res, next) => {
   }
 };
 
+// Creates the account first, then the role-specific record needed by patient/doctor workflows.
 const createUser = async (req, res, next) => {
   try {
     if (!ensureDb(res)) return;
@@ -164,10 +175,17 @@ const updateUser = async (req, res, next) => {
     const { name, role, email } = req.body;
     const updateData = { updated_at: new Date().toISOString() };
 
-    if (name !== undefined) updateData.name = String(name).trim();
-    if (email !== undefined) updateData.email = String(email).toLowerCase().trim();
+    if (name !== undefined) {
+      if (!String(name).trim()) return errorResponse(res, 'Name cannot be empty.', 400);
+      updateData.name = String(name).trim();
+    }
+    if (email !== undefined) {
+      if (!String(email).trim()) return errorResponse(res, 'Email cannot be empty.', 400);
+      updateData.email = String(email).toLowerCase().trim();
+    }
     if (role !== undefined) {
       if (!ROLES.includes(role)) return errorResponse(res, `Invalid role. Must be one of: ${ROLES.join(', ')}`, 400);
+      if (req.params.id === req.user.id && role !== 'Admin') return errorResponse(res, 'You cannot remove your own Admin role.', 400);
       updateData.role = role;
     }
 
@@ -178,6 +196,7 @@ const updateUser = async (req, res, next) => {
       .select('id, email, name, role, is_active, created_at, updated_at')
       .single();
 
+    if (error?.code === '23505') return errorResponse(res, 'A user with this email already exists.', 409);
     if (error || !user) return errorResponse(res, 'User not found or update failed.', 404);
     return successResponse(res, 'User updated successfully', user);
   } catch (error) {
@@ -228,6 +247,7 @@ const resetUserPassword = async (req, res, next) => {
   }
 };
 
+// Availability is derived from account state, doctor availability, and active appointments—not stored separately.
 const getActiveStaff = async (req, res, next) => {
   try {
     if (!ensureDb(res)) return;

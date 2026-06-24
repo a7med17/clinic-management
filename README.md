@@ -83,12 +83,12 @@ The login screen features interactive badges to pre-populate these credentials. 
 
 | Role | Email | Password | Logged-in Name | Dashboard Flow |
 |---|---|---|---|---|
-| **Admin** | `admin@medicore.com` | `password123` | Chief Administrator | Admin Control Panel |
-| **Doctor** | `doctor@medicore.com` | `password123` | Dr. Sarah Jenkins | Doctor Dashboard |
-| **Patient** | `patient@medicore.com` | `password123` | Jane Mary Doe | Patient Portal |
-| **Receptionist** | `receptionist@medicore.com` | `password123` | Alice Smith | Reception Panel |
-| **Pharmacist** | `pharmacist@medicore.com` | `password123` | John Doe | Pharmacy Panel |
-| **Laboratory Staff** | `labstaff@medicore.com` | `password123` | Robert Johnson | Laboratory Panel |
+| **Admin** | `admin@medicore.com` | `Pass123` | Chief Administrator | Admin Control Panel |
+| **Doctor** | `doctor@medicore.com` | `Pass123` | Dr. Sarah Jenkins | Doctor Dashboard |
+| **Patient** | `patient@medicore.com` | `Pass123` | Jane Mary Doe | Patient Portal |
+| **Receptionist** | `receptionist@medicore.com` | `Pass123` | Alice Smith | Reception Panel |
+| **Pharmacist** | `pharmacist@medicore.com` | `Pass123` | John Doe | Pharmacy Panel |
+| **Laboratory Staff** | `labstaff@medicore.com` | `Pass123` | Robert Johnson | Laboratory Panel |
 
 ---
 

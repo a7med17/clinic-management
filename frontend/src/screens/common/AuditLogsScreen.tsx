@@ -1,3 +1,4 @@
+// Placeholder audit-log screen; no audit-log API is wired to this navigation surface yet.
 import React from 'react';
 import { StyleSheet, View, Text, SafeAreaView } from 'react-native';
 

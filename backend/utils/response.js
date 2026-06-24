@@ -1,4 +1,7 @@
 /**
+ * Response envelope used by every API controller: { success, message, data? }.
+ * Keeping this shape stable lets frontend services safely unwrap `data.data`.
+ *
  * Sends a standardized success API response
  * @param {object} res - Express response object
  * @param {string} message - Success message

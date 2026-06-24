@@ -1,65 +1,55 @@
-# Project Diagnosis and Resolution Report
+# Final QA, Security, and Submission Report
 
-## 1. Frontend Repository Submodule Issue
-**Root Cause:** The `frontend` directory was added to the git repository as a missing/broken git submodule, so it could not be cloned or set up directly.
-**Affected File:** `.gitmodules` (missing), `frontend` (submodule pointer).
-**Corrected Code:** Removed the broken submodule and rebuilt the frontend structure using the base `npx create-expo-app@latest frontend --template blank-typescript`.
+## Completed modules
 
-## 2. Frontend Dependencies and Reanimated Fix
-**Root Cause:** Several standard Expo dependencies and React Navigation dependencies were missing or mismatched. The project also required `react-native-worklets` to properly run Reanimated without crashing. Reanimated also requires explicit configuration in babel.config.js.
-**Affected File:** `frontend/package.json`, `frontend/babel.config.js`
-**Corrected Code:** 
-```javascript
-// babel.config.js
-module.exports = function(api) {
-  api.cache(true);
-  return {
-    presets: ['babel-preset-expo'],
-    plugins: [
-      'react-native-reanimated/plugin',
-    ]
-  };
-};
-```
-Installed dependencies using `npx expo install --fix` and explicitly added `@react-navigation/native`, `@react-navigation/bottom-tabs`, `@react-navigation/native-stack`, and `@react-native-async-storage/async-storage`.
+- Authentication, registration, profile retrieval, password change, logout
+- Admin dashboard and user/staff management
+- Doctor dashboard, appointments, patients, laboratory workflow
+- Patient dashboard, booking, records, laboratory results
+- Reception patient, appointment, waiting-room, billing and payment workflows
+- Pharmacy medicine and inventory workflows
+- Laboratory test/result workflows
 
-## 3. Environment Variable Configuration
-**Root Cause:** `.env` files were missing, leaving Expo and the backend unable to configure URLs and ports properly. The frontend could not use `localhost` because of Expo Go requirements.
-**Affected File:** `frontend/.env`, `backend/.env`
-**Corrected Code:**
-```env
-# frontend/.env
-EXPO_PUBLIC_API_URL=http://192.168.0.2:5000/api
-```
-```env
-# backend/.env
-PORT=5000
-SUPABASE_URL=http://localhost
-SUPABASE_ANON_KEY=anon
-JWT_SECRET=secret
-```
+## Database summary
 
-## 4. Frontend App Structure and Navigation
-**Root Cause:** The base application structure (`App.tsx`) and an initial authentication flow were missing or broken.
-**Affected File:** `frontend/App.tsx`, `frontend/src/screens/Auth/LoginScreen.tsx`
-**Corrected Code:** Created an initial native stack navigator incorporating a basic `LoginScreen` and a fallback `HomeScreen`, using `axios` to handle the `POST /api/auth/login` request properly.
+The schema defines users, patients, doctors, doctor schedules, appointments, invoices, invoice items, payments, medicines, lab tests, and audit logs. It includes foreign keys, constrained role/status values, indexes, and a partial unique `(doctor_id, appointment_date)` index for active appointments.
 
-## 5. Backend Startup Issues
-**Root Cause:** The backend needed explicit dependency installations, missing in the CI/CD environment flow. 
-**Affected File:** `backend/package.json`
-**Corrected Code:** Executed `npm install` inside the `backend` and verified API availability using `curl`.
+## Security measures verified
 
----
-**Verification Status:**
-✅ Backend starts successfully
-✅ Frontend starts successfully
-✅ Expo Go connects (simulated via successful export and metro checks)
-✅ Login screen renders
-✅ Navigation works
-✅ Environment variables work
-✅ Supabase initializes (handled gracefully inside auth controller with demo fallback)
-✅ No TypeScript errors
-✅ No Metro errors
-✅ No package conflicts
-✅ No runtime crashes
-✅ Project is ready for continued Hospital Management System development
+- Passwords are written with bcrypt and auth/user responses select safe fields only.
+- Legacy plaintext password comparison was removed.
+- JWTs require a configured secret of at least 32 characters.
+- Protected routes require a valid bearer token; role middleware returns 403 for unauthorized roles.
+- Every protected request refreshes the user’s current role and `is_active` status, so deactivated users and role changes take effect immediately.
+- Tokens are stored in Expo SecureStore, not AsyncStorage.
+- `.env` patterns are ignored by Git; tracked-file review found no environment files.
+- Appointment access is scoped to the signed-in patient or doctor where applicable.
+
+## QA checklist
+
+| Check | Result |
+| --- | --- |
+| Frontend TypeScript compilation | Passed |
+| Backend JavaScript syntax validation | Passed |
+| Public API health endpoint | Ready for smoke test |
+| Missing-token protected endpoint response | Returns 401 |
+| Invalid/expired JWT response | Returns 401 |
+| Inactive user login | Rejected by login query |
+| Deactivated user with old token | Rejected by auth middleware |
+| Role mismatch | Rejected with 403 by role middleware |
+| Appointment double-booking | Protected by database unique index; controller maps conflict to 409 |
+
+## Bugs found and fixes applied
+
+1. Plaintext password fallback could authenticate legacy unencrypted records. Removed; passwords must be bcrypt hashes.
+2. A deactivated account could continue using a previously issued JWT. Auth middleware now checks current account status and role on every protected request.
+3. Patient booking payloads could name another patient, and appointment detail/update endpoints were not ownership-scoped. Added ownership checks.
+4. A default JWT secret made a misconfigured deployment unsafe. Authentication now fails closed until a proper secret is supplied.
+5. The token was stored in AsyncStorage. It now uses Expo SecureStore and existing sessions are validated on app launch.
+6. README contained outdated plaintext demo credentials and claimed an unconfigured database had a demo fallback. Documentation now reflects actual behavior.
+
+## Remaining limitations / future enhancements
+
+- A configured Supabase test environment is needed to execute full live CRUD and database-constraint tests for every role.
+- Add automated API/mobile end-to-end coverage, rate limiting, password recovery, and complete pagination.
+- The login screen’s password-recovery control remains a non-functional UI placeholder and should be hidden or wired before public release.

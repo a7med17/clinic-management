@@ -1,3 +1,4 @@
+// Legacy patient directory with an API-first load and local demo records for disconnected development.
 import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
@@ -44,7 +45,15 @@ export default function EHRDirectoryScreen({ navigation }: { navigation: any }) 
     try {
       const response = await api.get('/patients');
       if (response.data && response.data.success) {
-        setPatients(response.data.data);
+        setPatients((response.data.data || []).map((patient: any) => ({
+          id: patient.id,
+          name: patient.name,
+          date_of_birth: patient.date_of_birth || 'Not recorded',
+          gender: patient.gender || 'Unspecified',
+          blood_type: patient.blood_type || 'Not recorded',
+          diagnoses: patient.medical_conditions || 'Not recorded',
+          medications: 'Not recorded',
+        })));
       }
     } catch (error) {
       console.warn('[EHR Screen] Failed to fetch patients from API. Using local fallbacks.');
@@ -97,6 +106,7 @@ export default function EHRDirectoryScreen({ navigation }: { navigation: any }) 
     navigation.replace('Login');
   };
 
+  // Filtering is intentionally local because this legacy screen already holds a small result set.
   const filteredPatients = patients.filter((patient) => {
     const query = searchQuery.toLowerCase();
     return (

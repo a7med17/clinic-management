@@ -1,3 +1,4 @@
+// Role-aware screen collection. Each workflow is grouped below but shares the same design primitives and API adapters.
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +15,59 @@ import {
   updateAdminUser,
   updateAdminUserStatus,
 } from '../../services/adminService';
+import {
+  AppointmentStatus,
+  DoctorAppointment,
+  DoctorDashboardData,
+  DoctorLabTest,
+  createDoctorLabTest,
+  getDoctorAppointment,
+  getDoctorAppointments,
+  getDoctorDashboard,
+  getDoctorLabTests,
+  getDoctorPatient,
+  getDoctorPatients,
+  getDoctorProfile,
+  updateDoctorAppointmentNotes,
+  updateDoctorAppointmentStatus,
+} from '../../services/doctorService';
+import {
+  PatientAppointment,
+  PatientDashboardData,
+  PatientRecordsData,
+  bookPatientAppointment,
+  cancelPatientAppointment,
+  getDoctorsForBooking,
+  getPatientAppointments,
+  getPatientDashboard,
+  getPatientLabResults,
+  getPatientProfile,
+  getPatientRecords,
+  updatePatientProfile,
+} from '../../services/patientService';
+import {
+  ReceptionAppointment,
+  ReceptionDashboardData,
+  ReceptionInvoice,
+  ReceptionPatient,
+  cancelReceptionAppointment,
+  checkInReceptionAppointment,
+  createReceptionAppointment,
+  createReceptionInvoice,
+  createReceptionPatient,
+  getReceptionAppointments,
+  getReceptionDashboard,
+  getReceptionInvoices,
+  getReceptionPatients,
+  getReceptionProfile,
+  getReceptionWaitingRoom,
+  recordReceptionPayment,
+  updateReceptionAppointment,
+  updateReceptionPatient,
+  updateReceptionProfile,
+} from '../../services/receptionService';
+import { Medicine, getMedicines } from '../../services/pharmacyService';
+import { LabTestRecord, getLabTests, updateLabTest } from '../../services/labService';
 import {
   ActionCard,
   ChartCard,
@@ -41,7 +95,10 @@ import {
 } from '../../ui/clinicData';
 
 const adminRoles: Role[] = ['Admin', 'Doctor', 'Patient', 'Receptionist', 'Pharmacist', 'Laboratory Staff'];
+const appointmentStatuses: AppointmentStatus[] = ['Pending', 'Confirmed', 'Checked In', 'In Consultation', 'Completed', 'Cancelled', 'No Show'];
+const labStatuses = ['All', 'Pending', 'Processing', 'Completed', 'Cancelled'];
 
+// Resolve role/user data supplied once by the navigator; fallbacks keep preview screens usable without a session.
 function getRole(route: any): Role {
   return route?.params?.user?.role || 'Patient';
 }
@@ -55,6 +112,7 @@ function grid(children: React.ReactNode) {
   return <View style={local.grid}>{children}</View>;
 }
 
+// Dashboard dispatcher: each role receives only its dashboard and its API calls.
 export function RoleDashboardScreen({ navigation, route }: any) {
   const role = getRole(route);
   const name = getName(route);
@@ -67,6 +125,7 @@ export function RoleDashboardScreen({ navigation, route }: any) {
   return <PatientDashboard navigation={navigation} name={name} />;
 }
 
+// ── Role dashboards: fetch independently owned metrics and expose role-specific next actions. ──
 function AdminDashboard({ navigation }: any) {
   const [dashboard, setDashboard] = useState<AdminDashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -152,23 +211,71 @@ function AdminDashboard({ navigation }: any) {
 }
 
 function ReceptionDashboard({ navigation }: any) {
+  const [dashboard, setDashboard] = useState<ReceptionDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const loadDashboard = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setDashboard(await getReceptionDashboard());
+    } catch (loadError: any) {
+      console.error('[Reception Dashboard] Load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load reception dashboard.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  const metrics = dashboard?.metrics;
+  const waitingRoom = dashboard?.waitingRoom || [];
+
   return (
     <Screen>
       <Content>
         <Header title="Front Desk" subtitle="Manage operations" navigation={navigation} />
-        <SearchBar />
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity style={local.stateCard} onPress={loadDashboard}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
+        {grid(
+          <>
+            <StatCard icon="calendar-outline" value={`${metrics?.todaysAppointments ?? 0}`} label="Today's Appts" tone={colors.blue} />
+            <StatCard icon="time-outline" value={`${metrics?.waitingPatients ?? 0}`} label="Waiting" tone={colors.orange} />
+            <StatCard icon="checkmark-circle-outline" value={`${metrics?.checkedInPatients ?? 0}`} label="Checked In" tone={colors.teal} />
+            <StatCard icon="receipt-outline" value={`${metrics?.pendingBillingCount ?? 0}`} label="Pending Bills" tone={colors.red} />
+          </>,
+        )}
         <SectionHeader title="Quick Actions" />
         {grid(
           <>
-            <ActionCard large icon="person-add-outline" title="Register" subtitle="New Patient" tone={colors.orange} onPress={() => navigation.navigate('ModuleDetail', { title: 'Register Patient' })} />
-            <ActionCard large icon="calendar-outline" title="Schedule" subtitle="Appointment" tone={colors.blue} onPress={() => navigation.navigate('ModuleDetail', { title: 'Schedule Appointment' })} />
-            <ActionCard icon="cash-outline" title="Billing" tone={colors.teal} onPress={() => navigation.navigate('ModuleDetail', { title: 'Billing' })} />
-            <ActionCard icon="document-text-outline" title="Records" tone={colors.purple} onPress={() => navigation.navigate('ModuleDetail', { title: 'Records' })} />
+            <ActionCard large icon="person-add-outline" title="Register" subtitle="New Patient" tone={colors.orange} onPress={() => navigation.getParent()?.navigate('ReceptionPatientForm')} />
+            <ActionCard large icon="calendar-outline" title="Schedule" subtitle="Appointment" tone={colors.blue} onPress={() => navigation.getParent()?.navigate('ReceptionAppointmentForm')} />
+            <ActionCard icon="cash-outline" title="Billing" tone={colors.teal} onPress={() => navigation.navigate('Billing')} />
+            <ActionCard icon="document-text-outline" title="Patients" tone={colors.purple} onPress={() => navigation.navigate('Patients')} />
           </>,
         )}
-        <SectionHeader title="Waiting Room" action="4 Waiting" />
-        {patients.slice(0, 4).map((item, index) => (
-          <ListRow key={item.id} title={item.name} subtitle={item.meta} meta={item.detail} status={index === 0 ? '15m' : item.status} tone={index === 0 ? colors.orange : colors.teal} onPress={() => navigation.navigate('ModuleDetail', { title: item.name })} />
+        <SectionHeader title="Waiting Room" action={`${waitingRoom.length} Waiting`} onPress={() => navigation.getParent()?.navigate('ReceptionWaitingRoom')} />
+        {!loading && !error && waitingRoom.length === 0 ? <Text style={local.stateText}>No patients currently waiting.</Text> : null}
+        {waitingRoom.map((item) => (
+          <ListRow
+            key={item.id}
+            title={item.patients?.name || 'Patient'}
+            subtitle={item.doctors?.name || 'Doctor'}
+            meta={new Date(item.appointment_date).toLocaleString()}
+            status={`#${item.queuePosition || '-'}`}
+            tone={item.status === 'In Consultation' ? colors.green : colors.orange}
+            icon="time-outline"
+            onPress={() => navigation.getParent()?.navigate('ReceptionAppointmentDetail', { appointment: item })}
+          />
         ))}
       </Content>
     </Screen>
@@ -176,32 +283,53 @@ function ReceptionDashboard({ navigation }: any) {
 }
 
 function PharmacyDashboard({ navigation }: any) {
+  const [items, setItems] = useState<Medicine[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setItems(await getMedicines());
+    } catch (loadError: any) {
+      console.error('[Pharmacy Dashboard] Load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load pharmacy inventory.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const lowStock = items.filter((item) => Number(item.quantity || 0) <= 10);
+  const expiring = items.filter((item) => item.expiry_date && item.expiry_date <= today);
+
   return (
     <Screen>
       <Content>
         <Header title="Pharmacy" subtitle="Inventory & Dispensing" navigation={navigation} />
-        <View style={local.alert}>
-          <View style={[local.alertIcon, { backgroundColor: '#ffe3e8' }]}>
-            <Ionicons name="warning-outline" size={22} color={colors.red} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={local.alertTitle}>Low Stock Alerts</Text>
-            <Text style={local.alertText}>3 medicines are running below the critical threshold limit.</Text>
-            <View style={local.pillRow}>
-              <Text style={local.pill}>Amoxicillin</Text>
-              <Text style={local.pill}>Ibuprofen</Text>
-            </View>
-          </View>
-        </View>
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity style={local.stateCard} onPress={load}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
         {grid(
           <>
-            <ActionCard large icon="bandage-outline" title="Dispense" subtitle="Process prescription" tone={colors.green} onPress={() => navigation.navigate('ModuleDetail', { title: 'Dispense Medicine' })} />
-            <ActionCard large icon="add-outline" title="Add Stock" subtitle="Update inventory" tone={colors.blue} onPress={() => navigation.navigate('ModuleDetail', { title: 'Add Stock' })} />
+            <StatCard icon="cube-outline" value={`${items.length}`} label="Medicines" tone={colors.blue} />
+            <StatCard icon="warning-outline" value={`${lowStock.length}`} label="Low Stock" tone={colors.red} />
+            <StatCard icon="calendar-outline" value={`${expiring.length}`} label="Expiring" tone={colors.orange} />
           </>,
         )}
-        <SectionHeader title="Recent Prescriptions" action="View All" onPress={() => navigation.navigate('ModuleDetail', { title: 'Recent Prescriptions' })} />
-        {prescriptions.map((item) => (
-          <ListRow key={item.id} title={item.patient} subtitle={item.items} meta={item.id} status={item.status} tone={item.status === 'Pending' ? colors.green : colors.blue} onPress={() => navigation.navigate('ModuleDetail', { title: item.id })} />
+        <SectionHeader title="Low Stock Alerts" action="View All" onPress={() => navigation.navigate('Alerts')} />
+        {!loading && !error && lowStock.length === 0 ? <Text style={local.stateText}>No low-stock medicines found.</Text> : null}
+        {lowStock.slice(0, 4).map((item) => (
+          <ListRow key={item.id} title={item.name} subtitle={`Quantity: ${item.quantity}`} meta={item.expiry_date ? `Expires ${item.expiry_date}` : 'No expiry date'} status="Low" tone={colors.red} icon="warning-outline" onPress={() => navigation.navigate('Inventory')} />
         ))}
       </Content>
     </Screen>
@@ -209,66 +337,152 @@ function PharmacyDashboard({ navigation }: any) {
 }
 
 function DoctorDashboard({ navigation, name }: any) {
+  const [dashboard, setDashboard] = useState<DoctorDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const loadDashboard = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setDashboard(await getDoctorDashboard());
+    } catch (loadError: any) {
+      console.error('[Doctor Dashboard] Load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load doctor dashboard.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  const metrics = dashboard?.metrics;
+  const doctor = dashboard?.doctor;
   return (
     <Screen>
       <Content>
-        <Header title={name || 'Dr. Sarah Smith'} subtitle="Tuesday, 15 Oct" navigation={navigation} avatar="SS" />
+        <Header title={doctor?.name || name || 'Doctor'} subtitle={doctor?.specialization || 'Clinical workspace'} navigation={navigation} avatar={(doctor?.name || name || 'DR').slice(0, 2).toUpperCase()} />
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity activeOpacity={0.82} style={local.stateCard} onPress={loadDashboard}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
         {grid(
           <>
-            <StatCard icon="ellipse" value="08" label="Today's Appts" tone={colors.blue} />
-            <StatCard icon="ellipse" value="02" label="Pending" tone={colors.orange} />
+            <StatCard icon="calendar-outline" value={`${metrics?.todaysAppointments ?? '-'}`} label="Today's Appts" tone={colors.blue} />
+            <StatCard icon="time-outline" value={`${metrics?.pendingConsultations ?? '-'}`} label="Pending" tone={colors.orange} />
+            <StatCard icon="people-outline" value={`${metrics?.patientQueue ?? '-'}`} label="Queue" tone={colors.teal} />
+            <StatCard icon="flask-outline" value={`${metrics?.labRequests ?? '-'}`} label="Lab Requests" tone={colors.red} />
           </>,
         )}
-        <SectionHeader title="Today's Schedule" action="View All" />
-        <View style={local.featureCard}>
-          <Text style={local.featureBadge}>IN PROGRESS</Text>
-          <Text style={local.featureTime}>10:00 AM</Text>
-          <Text style={local.featureTitle}>Mark Henderson</Text>
-          <Text style={local.featureText}>Follow-up - Cardiology</Text>
-          <TouchableOpacity style={local.featureButton} onPress={() => navigation.navigate('ModuleDetail', { title: 'Mark Henderson Notes' })}>
-            <Text style={local.featureButtonText}>View Notes</Text>
-          </TouchableOpacity>
-        </View>
-        {patients.slice(1, 4).map((item) => (
-          <ListRow key={item.id} title={item.name} subtitle={item.meta} meta={item.detail} icon="time-outline" tone={colors.blue} onPress={() => navigation.navigate('ModuleDetail', { title: item.name })} />
+        <SectionHeader title="Today's Schedule" action="View All" onPress={() => navigation.navigate('Schedule')} />
+        {!loading && !error && dashboard?.upcomingAppointments.length === 0 ? <Text style={local.stateText}>No appointments scheduled.</Text> : null}
+        {(dashboard?.upcomingAppointments || []).map((item) => (
+          <ListRow
+            key={item.id}
+            title={item.patients?.name || 'Patient'}
+            subtitle={item.status}
+            meta={new Date(item.appointment_date).toLocaleString()}
+            icon="time-outline"
+            tone={item.status === 'Completed' ? colors.green : colors.blue}
+            onPress={() => navigation.getParent()?.navigate('DoctorAppointmentDetail', { id: item.id })}
+          />
         ))}
+        <ListRow title="Completed Today" subtitle={`${metrics?.completedToday ?? '-'} consultations completed`} icon="checkmark-done-outline" tone={colors.green} />
+        <ListRow title="Lab Requests" subtitle="Create or review lab requests" icon="flask-outline" tone={colors.red} onPress={() => navigation.getParent()?.navigate('DoctorLabTests')} />
       </Content>
     </Screen>
   );
 }
 
 function PatientDashboard({ navigation, name }: any) {
+  const [dashboard, setDashboard] = useState<PatientDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const loadDashboard = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setDashboard(await getPatientDashboard());
+    } catch (loadError: any) {
+      console.error('[Patient Dashboard] Load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load patient dashboard.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  const upcoming = dashboard?.upcomingAppointment;
+  const patient = dashboard?.patient;
+  const latestLab = dashboard?.latestLabResult;
+  const recentAppointments = dashboard?.recentActivity?.appointments || [];
+  const recentLabs = dashboard?.recentActivity?.labResults || [];
+
   return (
     <Screen>
       <Content>
-        <Header title={name || 'Alex Johnson'} subtitle="Good Morning," navigation={navigation} />
+        <Header title={patient?.name || name || 'Patient'} subtitle="Good Morning," navigation={navigation} />
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity style={local.stateCard} onPress={loadDashboard}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
         <SectionHeader title="Upcoming Appointment" />
-        <View style={local.appointmentHero}>
-          <View style={local.heroIcon}>
-            <Ionicons name="medical-outline" size={26} color="#ffffff" />
+        {upcoming ? (
+          <View style={local.appointmentHero}>
+            <View style={local.heroIcon}>
+              <Ionicons name="medical-outline" size={26} color="#ffffff" />
+            </View>
+            <Text style={local.heroTitle}>{upcoming.doctors?.name || 'Doctor'}</Text>
+            <Text style={local.heroSub}>{upcoming.doctors?.specialization || upcoming.status}</Text>
+            <View style={local.heroTime}>
+              <Ionicons name="calendar-outline" size={17} color="#ffffff" />
+              <Text style={local.heroTimeText}>{new Date(upcoming.appointment_date).toLocaleString()}</Text>
+            </View>
           </View>
-          <Text style={local.heroTitle}>Dr. Sarah Smith</Text>
-          <Text style={local.heroSub}>Cardiologist</Text>
-          <View style={local.heroTime}>
-            <Ionicons name="calendar-outline" size={17} color="#ffffff" />
-            <Text style={local.heroTimeText}>Tomorrow, 10:00 AM</Text>
+        ) : !loading && !error ? (
+          <View style={local.stateCard}>
+            <Text style={local.stateText}>No upcoming appointment found.</Text>
           </View>
-        </View>
+        ) : null}
+        {grid(
+          <>
+            <StatCard icon="calendar-outline" value={`${dashboard?.appointmentCount ?? 0}`} label="Appointments" tone={colors.blue} />
+            <StatCard icon="flask-outline" value={latestLab?.status || 'None'} label="Latest Lab" tone={colors.red} />
+          </>,
+        )}
         <SectionHeader title="Quick Actions" />
         {grid(
           <>
-            <ActionCard icon="calendar-outline" title="Book Appt" tone={colors.blue} onPress={() => navigation.navigate('ModuleDetail', { title: 'Book Appointment' })} />
-            <ActionCard icon="document-text-outline" title="Records" tone={colors.purple} onPress={() => navigation.navigate('ModuleDetail', { title: 'Medical Records' })} />
-            <ActionCard icon="flask-outline" title="Lab Results" tone={colors.red} onPress={() => navigation.navigate('ModuleDetail', { title: 'Lab Results' })} />
-            <ActionCard icon="medical-outline" title="My Doctors" tone={colors.teal} onPress={() => navigation.navigate('ModuleDetail', { title: 'My Doctors' })} />
+            <ActionCard icon="calendar-outline" title="Book Appt" tone={colors.blue} onPress={() => navigation.getParent()?.navigate('PatientBookAppointment')} />
+            <ActionCard icon="document-text-outline" title="Records" tone={colors.purple} onPress={() => navigation.navigate('Records')} />
+            <ActionCard icon="flask-outline" title="Lab Results" tone={colors.red} onPress={() => navigation.getParent()?.navigate('PatientLabResults')} />
+            <ActionCard icon="medical-outline" title="My Doctors" tone={colors.teal} onPress={() => navigation.navigate('Appointments')} />
           </>,
         )}
         <SectionHeader title="Health Summary" />
-        <ListRow title="Blood Type" subtitle="O positive" icon="water-outline" tone={colors.red} />
-        <ListRow title="Allergies" subtitle="Penicillin, shellfish" icon="alert-circle-outline" tone={colors.orange} />
-        <ListRow title="Emergency Contact" subtitle="Maya Johnson - +973 3888 5012" icon="call-outline" tone={colors.green} />
-        <SectionHeader title="Recent Activity" action="See All" />
-        <ListRow title="Blood Test Results" subtitle="Ready to view" icon="flask-outline" tone={colors.red} onPress={() => navigation.navigate('ModuleDetail', { title: 'Blood Test Results' })} />
+        <ListRow title="Blood Type" subtitle={dashboard?.healthSummary?.bloodType || 'Not recorded'} icon="water-outline" tone={colors.red} />
+        <ListRow title="Allergies" subtitle={dashboard?.healthSummary?.allergies || 'None recorded'} icon="alert-circle-outline" tone={colors.orange} />
+        <ListRow title="Emergency Contact" subtitle={dashboard?.healthSummary?.emergencyContact || 'Not recorded'} icon="call-outline" tone={colors.green} />
+        <SectionHeader title="Recent Activity" action="See All" onPress={() => navigation.navigate('Records')} />
+        {!loading && !error && recentAppointments.length === 0 && recentLabs.length === 0 ? <Text style={local.stateText}>No recent activity yet.</Text> : null}
+        {recentAppointments.slice(0, 2).map((item) => (
+          <ListRow key={item.id} title={item.doctors?.name || 'Appointment'} subtitle={item.status} meta={new Date(item.appointment_date).toLocaleString()} icon="calendar-outline" tone={colors.blue} onPress={() => navigation.getParent()?.navigate('PatientAppointmentDetail', { appointment: item })} />
+        ))}
+        {recentLabs.slice(0, 1).map((item) => (
+          <ListRow key={item.id} title={item.test_name} subtitle={item.status} meta={item.result || new Date(item.created_at).toLocaleString()} icon="flask-outline" tone={item.status === 'Completed' ? colors.green : colors.red} onPress={() => navigation.getParent()?.navigate('PatientLabResults')} />
+        ))}
       </Content>
     </Screen>
   );
@@ -276,16 +490,48 @@ function PatientDashboard({ navigation, name }: any) {
 
 function LabDashboard({ navigation }: any) {
   const [filter, setFilter] = useState('Pending');
-  const filtered = useMemo(() => labTests.filter((test) => (filter === 'Pending' ? test.status !== 'Completed' : test.status === filter)), [filter]);
+  const [items, setItems] = useState<LabTestRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setItems(await getLabTests());
+    } catch (loadError: any) {
+      console.error('[Lab Dashboard] Load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load laboratory tests.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const filtered = useMemo(() => items.filter((test) => (filter === 'Pending' ? test.status !== 'Completed' : test.status === filter)), [filter, items]);
+  const pending = items.filter((item) => item.status === 'Pending').length;
+  const processing = items.filter((item) => item.status === 'Processing').length;
+  const completed = items.filter((item) => item.status === 'Completed').length;
+
   return (
     <Screen>
       <Content>
         <Header title="Laboratory" subtitle="Diagnostic Center" navigation={navigation} />
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity style={local.stateCard} onPress={load}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
         {grid(
           <>
-            <StatCard icon="clipboard-outline" value="12" label="PENDING" tone={colors.red} />
-            <StatCard icon="flask-outline" value="05" label="PROCESSING" tone={colors.blue} />
-            <StatCard icon="document-attach-outline" value="18" label="COMPLETED" tone={colors.green} />
+            <StatCard icon="clipboard-outline" value={`${pending}`} label="PENDING" tone={colors.red} />
+            <StatCard icon="flask-outline" value={`${processing}`} label="PROCESSING" tone={colors.blue} />
+            <StatCard icon="document-attach-outline" value={`${completed}`} label="COMPLETED" tone={colors.green} />
           </>,
         )}
         <SectionHeader title="Test Queue" />
@@ -296,16 +542,17 @@ function LabDashboard({ navigation }: any) {
             </TouchableOpacity>
           ))}
         </View>
+        {!loading && !error && filtered.length === 0 ? <Text style={local.stateText}>No lab tests found.</Text> : null}
         {filtered.map((item, index) => (
           <ListRow
             key={item.id}
-            title={item.name}
-            subtitle={`Patient: ${item.patient}`}
-            meta={`Requested by ${item.requester}`}
-            status={index === 0 && item.status === 'Processing' ? '45m left' : item.status}
+            title={item.test_name}
+            subtitle={`Patient: ${item.patients?.name || 'Unassigned'}`}
+            meta={`Requested by ${item.doctors?.name || 'Clinic'}`}
+            status={item.status}
             tone={item.status === 'Completed' ? colors.green : item.status === 'Processing' ? colors.red : colors.blue}
             icon="flask-outline"
-            onPress={() => navigation.navigate('ModuleDetail', { title: item.name })}
+            onPress={() => navigation.navigate('Tests')}
           />
         ))}
       </Content>
@@ -313,9 +560,19 @@ function LabDashboard({ navigation }: any) {
   );
 }
 
+// Tab dispatcher for resource screens whose implementation depends on the current role and selected tab name.
 export function RoleListScreen({ navigation, route }: any) {
   const role = getRole(route);
   const title = route.name;
+  if (role === 'Doctor' && title === 'Schedule') return <DoctorAppointmentsScreen navigation={navigation} />;
+  if (role === 'Doctor' && title === 'Patients') return <DoctorPatientsScreen navigation={navigation} />;
+  if (role === 'Patient' && title === 'Appointments') return <PatientAppointmentsScreen navigation={navigation} />;
+  if (role === 'Patient' && title === 'Records') return <PatientRecordsScreen navigation={navigation} />;
+  if (role === 'Receptionist' && title === 'Patients') return <ReceptionPatientsScreen navigation={navigation} />;
+  if (role === 'Receptionist' && title === 'Appointments') return <ReceptionAppointmentsScreen navigation={navigation} />;
+  if (role === 'Receptionist' && title === 'Billing') return <ReceptionBillingScreen navigation={navigation} />;
+  if (role === 'Pharmacist' && (title === 'Inventory' || title === 'Medicines' || title === 'Alerts')) return <PharmacyInventoryScreen navigation={navigation} mode={title} />;
+  if (role === 'Laboratory Staff' && (title === 'Tests' || title === 'Results')) return <LaboratoryTestsScreen navigation={navigation} mode={title} />;
   let rows = patients.map((item) => ({ title: item.name, subtitle: item.meta, meta: item.detail, status: item.status, tone: colors.teal, icon: 'person-outline' }));
   if (title === 'Appointments' || title === 'Schedule') rows = appointments.map((item) => ({ title: item.title, subtitle: item.subtitle, meta: item.time, status: item.status, tone: colors.blue, icon: 'calendar-outline' }));
   if (title === 'Records' || title === 'Results') rows = labTests.map((item) => ({ title: item.name, subtitle: item.patient, meta: item.requester, status: item.status, tone: colors.red, icon: 'document-text-outline' }));
@@ -337,6 +594,1070 @@ export function RoleListScreen({ navigation, route }: any) {
   );
 }
 
+export function PharmacyInventoryScreen({ navigation, mode }: any) {
+  const [items, setItems] = useState<Medicine[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setItems(await getMedicines(mode === 'Alerts' ? { low_stock: true } : undefined));
+    } catch (loadError: any) {
+      console.error('[Pharmacy Inventory] Load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load inventory.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, [mode]);
+
+  return (
+    <Screen>
+      <Content>
+        <Header title={mode} subtitle="Pharmacy inventory" navigation={navigation} />
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity style={local.stateCard} onPress={load}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
+        {!loading && !error && items.length === 0 ? <Text style={local.stateText}>No medicines found.</Text> : null}
+        {items.map((item) => {
+          const low = Number(item.quantity || 0) <= 10;
+          return (
+            <ListRow
+              key={item.id}
+              title={item.name}
+              subtitle={`Quantity: ${item.quantity}`}
+              meta={item.expiry_date ? `Expires ${item.expiry_date}` : item.price ? `Price: ${item.price}` : 'No extra details'}
+              status={low ? 'Low' : 'In Stock'}
+              icon={low ? 'warning-outline' : 'medkit-outline'}
+              tone={low ? colors.red : colors.green}
+            />
+          );
+        })}
+      </Content>
+    </Screen>
+  );
+}
+
+export function LaboratoryTestsScreen({ navigation, mode }: any) {
+  const [items, setItems] = useState<LabTestRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setItems(await getLabTests(mode === 'Results' ? { status: 'Completed' } : undefined));
+    } catch (loadError: any) {
+      console.error('[Laboratory Tests] Load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load lab tests.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const markProcessing = async (item: LabTestRecord) => {
+    try {
+      await updateLabTest(item.id, { status: item.status === 'Pending' ? 'Processing' : item.status });
+      await load();
+    } catch (updateError: any) {
+      console.error('[Laboratory Tests] Update error:', updateError.response?.data || updateError.message);
+      setError(updateError.response?.data?.message || 'Unable to update lab test.');
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, [mode]);
+
+  return (
+    <Screen>
+      <Content>
+        <Header title={mode} subtitle="Laboratory workflow" navigation={navigation} />
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity style={local.stateCard} onPress={load}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
+        {!loading && !error && items.length === 0 ? <Text style={local.stateText}>No lab tests found.</Text> : null}
+        {items.map((item) => (
+          <ListRow
+            key={item.id}
+            title={item.test_name}
+            subtitle={`${item.patients?.name || 'Unassigned'} - ${item.status}`}
+            meta={item.result || item.doctors?.name || new Date(item.created_at).toLocaleString()}
+            status={item.status}
+            icon="flask-outline"
+            tone={item.status === 'Completed' ? colors.green : item.status === 'Cancelled' ? colors.red : colors.blue}
+            onPress={() => markProcessing(item)}
+          />
+        ))}
+      </Content>
+    </Screen>
+  );
+}
+
+const patientFormDefaults = {
+  name: '',
+  email: '',
+  phone: '',
+  gender: '',
+  date_of_birth: '',
+  blood_type: '',
+  address: '',
+  emergency_contact: '',
+  insurance_provider: '',
+};
+
+// ── Reception workflow: patient registration, scheduling, queue visibility, invoices, and payments. ──
+export function ReceptionPatientsScreen({ navigation }: any) {
+  const [items, setItems] = useState<ReceptionPatient[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setItems(await getReceptionPatients(search));
+    } catch (loadError: any) {
+      console.error('[Reception Patients] Load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load patients.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return (
+    <Screen>
+      <Content>
+        <Header title="Patients" subtitle="Registration and search" navigation={navigation} />
+        <View style={local.formCard}>
+          <TextInput value={search} onChangeText={setSearch} placeholder="Search name, phone, email, or patient ID" placeholderTextColor="#8b97a8" style={local.input} />
+          <TouchableOpacity style={local.secondaryButton} onPress={load}>
+            <Text style={local.secondaryButtonText}>Search Patients</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity style={local.outlineButton} onPress={() => navigation.getParent()?.navigate('ReceptionPatientForm')}>
+          <Text style={local.outlineButtonText}>Register New Patient</Text>
+        </TouchableOpacity>
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity style={local.stateCard} onPress={load}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
+        {!loading && !error && items.length === 0 ? <Text style={local.stateText}>No patients found.</Text> : null}
+        {items.map((item) => (
+          <ListRow
+            key={item.id}
+            title={item.name}
+            subtitle={`${item.phone || item.email || 'No contact'} - Billing ${item.billingStatus || 'Clear'}`}
+            meta={item.upcomingAppointment ? `Next: ${new Date(item.upcomingAppointment.appointment_date).toLocaleString()}` : 'No upcoming appointment'}
+            status={item.blood_type || ''}
+            icon="person-outline"
+            tone={item.billingStatus === 'Pending' ? colors.orange : colors.teal}
+            onPress={() => navigation.getParent()?.navigate('ReceptionPatientForm', { patient: item })}
+          />
+        ))}
+      </Content>
+    </Screen>
+  );
+}
+
+export function ReceptionPatientFormScreen({ navigation, route }: any) {
+  const patient = route.params?.patient;
+  const [form, setForm] = useState<Record<string, any>>({ ...patientFormDefaults, ...(patient || {}) });
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+
+  const updateField = (field: keyof typeof patientFormDefaults, value: string) => setForm((current) => ({ ...current, [field]: value }));
+
+  const save = async () => {
+    try {
+      setSaving(true);
+      setMessage('');
+      const saved = patient?.id ? await updateReceptionPatient(patient.id, form) : await createReceptionPatient(form);
+      setForm({ ...patientFormDefaults, ...saved });
+      setIsError(false);
+      setMessage(patient?.id ? 'Patient updated.' : 'Patient registered.');
+    } catch (saveError: any) {
+      console.error('[Reception Patient Form] Save error:', saveError.response?.data || saveError.message);
+      setIsError(true);
+      setMessage(saveError.response?.data?.message || 'Unable to save patient.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Screen>
+      <Content>
+        <Header title={patient?.id ? 'Edit Patient' : 'Register Patient'} subtitle="Patient information" navigation={navigation} />
+        <View style={local.formCard}>
+          <TextInput placeholder="Full name" placeholderTextColor="#8b97a8" value={form.name} onChangeText={(value) => updateField('name', value)} style={local.input} />
+          <TextInput placeholder="Email" placeholderTextColor="#8b97a8" value={form.email || ''} onChangeText={(value) => updateField('email', value)} style={local.input} autoCapitalize="none" />
+          <TextInput placeholder="Phone" placeholderTextColor="#8b97a8" value={form.phone || ''} onChangeText={(value) => updateField('phone', value)} style={local.input} />
+          <TextInput placeholder="Gender" placeholderTextColor="#8b97a8" value={form.gender || ''} onChangeText={(value) => updateField('gender', value)} style={local.input} />
+          <TextInput placeholder="Date of birth" placeholderTextColor="#8b97a8" value={form.date_of_birth || ''} onChangeText={(value) => updateField('date_of_birth', value)} style={local.input} />
+          <TextInput placeholder="Blood group" placeholderTextColor="#8b97a8" value={form.blood_type || ''} onChangeText={(value) => updateField('blood_type', value)} style={local.input} />
+          <TextInput placeholder="Address" placeholderTextColor="#8b97a8" value={form.address || ''} onChangeText={(value) => updateField('address', value)} style={[local.input, local.textArea]} multiline />
+          <TextInput placeholder="Emergency contact" placeholderTextColor="#8b97a8" value={form.emergency_contact || ''} onChangeText={(value) => updateField('emergency_contact', value)} style={local.input} />
+          <TextInput placeholder="Insurance provider" placeholderTextColor="#8b97a8" value={form.insurance_provider || ''} onChangeText={(value) => updateField('insurance_provider', value)} style={local.input} />
+          {message ? <Text style={isError ? local.errorText : local.successText}>{message}</Text> : null}
+          <TouchableOpacity disabled={saving || !form.name} style={local.secondaryButton} onPress={save}>
+            <Text style={local.secondaryButtonText}>{saving ? 'Saving...' : 'Save Patient'}</Text>
+          </TouchableOpacity>
+        </View>
+      </Content>
+    </Screen>
+  );
+}
+
+export function ReceptionAppointmentsScreen({ navigation }: any) {
+  const [items, setItems] = useState<ReceptionAppointment[]>([]);
+  const [view, setView] = useState<'today' | 'upcoming'>('today');
+  const [status, setStatus] = useState('All');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setItems(await getReceptionAppointments({ view, status: status === 'All' ? undefined : status }));
+    } catch (loadError: any) {
+      console.error('[Reception Appointments] Load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load appointments.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, [view, status]);
+
+  return (
+    <Screen>
+      <Content>
+        <Header title="Appointments" subtitle="Front desk schedule" navigation={navigation} />
+        <TouchableOpacity style={local.secondaryButton} onPress={() => navigation.getParent()?.navigate('ReceptionAppointmentForm')}>
+          <Text style={local.secondaryButtonText}>Book Appointment</Text>
+        </TouchableOpacity>
+        <View style={local.chipRow}>
+          {['today', 'upcoming'].map((item) => (
+            <TouchableOpacity key={item} style={[local.chip, view === item && local.chipActive]} onPress={() => setView(item as any)}>
+              <Text style={[local.chipText, view === item && local.chipTextActive]}>{item === 'today' ? 'Today' : 'Upcoming'}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={local.chipRow}>
+          {['All', ...appointmentStatuses].map((item) => (
+            <TouchableOpacity key={item} style={[local.chip, status === item && local.chipActive]} onPress={() => setStatus(item)}>
+              <Text style={[local.chipText, status === item && local.chipTextActive]}>{item}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity style={local.stateCard} onPress={load}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
+        {!loading && !error && items.length === 0 ? <Text style={local.stateText}>No appointments found.</Text> : null}
+        {items.map((item) => (
+          <ListRow
+            key={item.id}
+            title={item.patients?.name || 'Patient'}
+            subtitle={`${item.doctors?.name || 'Doctor'} - ${item.status}`}
+            meta={new Date(item.appointment_date).toLocaleString()}
+            status={item.status}
+            icon="calendar-outline"
+            tone={item.status === 'Cancelled' ? colors.red : item.status === 'Checked In' ? colors.orange : colors.blue}
+            onPress={() => navigation.getParent()?.navigate('ReceptionAppointmentDetail', { appointment: item })}
+          />
+        ))}
+      </Content>
+    </Screen>
+  );
+}
+
+export function ReceptionAppointmentFormScreen({ navigation, route }: any) {
+  const appointment = route.params?.appointment;
+  const [patientsList, setPatientsList] = useState<ReceptionPatient[]>([]);
+  const [doctorsList, setDoctorsList] = useState<any[]>([]);
+  const [patientId, setPatientId] = useState(appointment?.patient_id || '');
+  const [doctorId, setDoctorId] = useState(appointment?.doctor_id || '');
+  const [appointmentDate, setAppointmentDate] = useState(appointment?.appointment_date || '');
+  const [notes, setNotes] = useState(appointment?.notes || '');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+
+  const loadOptions = async () => {
+    try {
+      setLoading(true);
+      const [patientOptions, doctorOptions] = await Promise.all([getReceptionPatients(), getDoctorsForBooking()]);
+      setPatientsList(patientOptions);
+      setDoctorsList(doctorOptions);
+      if (!patientId && patientOptions[0]) setPatientId(patientOptions[0].id);
+      if (!doctorId && doctorOptions[0]) setDoctorId(doctorOptions[0].id);
+    } catch (loadError: any) {
+      console.error('[Reception Appointment Form] Load error:', loadError.response?.data || loadError.message);
+      setIsError(true);
+      setMessage(loadError.response?.data?.message || 'Unable to load booking options.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const save = async () => {
+    try {
+      setSaving(true);
+      setMessage('');
+      const payload = { patient_id: patientId, doctor_id: doctorId, appointment_date: appointmentDate, notes };
+      await (appointment?.id ? updateReceptionAppointment(appointment.id, payload) : createReceptionAppointment(payload));
+      setIsError(false);
+      setMessage(appointment?.id ? 'Appointment updated.' : 'Appointment booked.');
+    } catch (saveError: any) {
+      console.error('[Reception Appointment Form] Save error:', saveError.response?.data || saveError.message);
+      setIsError(true);
+      setMessage(saveError.response?.data?.message || 'Unable to save appointment.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOptions();
+  }, []);
+
+  return (
+    <Screen>
+      <Content>
+        <Header title={appointment?.id ? 'Edit Appointment' : 'Book Appointment'} subtitle="Patient, doctor, and slot" navigation={navigation} />
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        <SectionHeader title="Patient" />
+        <View style={local.chipRow}>
+          {patientsList.slice(0, 20).map((patient) => (
+            <TouchableOpacity key={patient.id} style={[local.chip, patientId === patient.id && local.chipActive]} onPress={() => setPatientId(patient.id)}>
+              <Text style={[local.chipText, patientId === patient.id && local.chipTextActive]}>{patient.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <SectionHeader title="Doctor" />
+        <View style={local.chipRow}>
+          {doctorsList.map((doctor) => (
+            <TouchableOpacity key={doctor.id} style={[local.chip, doctorId === doctor.id && local.chipActive]} onPress={() => setDoctorId(doctor.id)}>
+              <Text style={[local.chipText, doctorId === doctor.id && local.chipTextActive]}>{doctor.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={local.formCard}>
+          <TextInput value={appointmentDate} onChangeText={setAppointmentDate} placeholder="Appointment date, e.g. 2026-06-20T10:00:00+03:00" placeholderTextColor="#8b97a8" style={local.input} />
+          <TextInput value={notes} onChangeText={setNotes} placeholder="Appointment notes" placeholderTextColor="#8b97a8" style={[local.input, local.textArea]} multiline />
+          {message ? <Text style={isError ? local.errorText : local.successText}>{message}</Text> : null}
+          <TouchableOpacity disabled={saving || !patientId || !doctorId || !appointmentDate} style={local.secondaryButton} onPress={save}>
+            <Text style={local.secondaryButtonText}>{saving ? 'Saving...' : 'Save Appointment'}</Text>
+          </TouchableOpacity>
+        </View>
+      </Content>
+    </Screen>
+  );
+}
+
+export function ReceptionAppointmentDetailScreen({ navigation, route }: any) {
+  const [appointment, setAppointment] = useState<ReceptionAppointment | null>(route.params?.appointment || null);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+
+  const run = async (action: 'checkIn' | 'cancel') => {
+    if (!appointment) return;
+    try {
+      setSaving(true);
+      setMessage('');
+      const updated = action === 'checkIn' ? await checkInReceptionAppointment(appointment.id) : await cancelReceptionAppointment(appointment.id);
+      setAppointment(updated);
+      setIsError(false);
+      setMessage(action === 'checkIn' ? 'Patient checked in.' : 'Appointment cancelled.');
+    } catch (error: any) {
+      console.error('[Reception Appointment Detail] Action error:', error.response?.data || error.message);
+      setIsError(true);
+      setMessage(error.response?.data?.message || 'Unable to update appointment.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Screen>
+      <Content>
+        <Header title="Appointment" subtitle={appointment?.patients?.name || 'Details'} navigation={navigation} />
+        {appointment ? (
+          <>
+            <ListRow title={appointment.patients?.name || 'Patient'} subtitle={appointment.doctors?.name || 'Doctor'} meta={new Date(appointment.appointment_date).toLocaleString()} status={appointment.status} icon="calendar-outline" tone={colors.blue} />
+            <ListRow title="Queue Position" subtitle={appointment.queuePosition ? `#${appointment.queuePosition}` : 'Not checked in'} icon="time-outline" tone={colors.orange} />
+            {message ? <Text style={isError ? local.errorText : local.successText}>{message}</Text> : null}
+            <TouchableOpacity disabled={saving || appointment.status === 'Checked In'} style={local.secondaryButton} onPress={() => run('checkIn')}>
+              <Text style={local.secondaryButtonText}>{saving ? 'Saving...' : 'Check In Patient'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={local.outlineButton} onPress={() => navigation.navigate('ReceptionAppointmentForm', { appointment })}>
+              <Text style={local.outlineButtonText}>Edit / Reschedule</Text>
+            </TouchableOpacity>
+            <TouchableOpacity disabled={saving || appointment.status === 'Cancelled'} style={local.outlineButton} onPress={() => run('cancel')}>
+              <Text style={local.outlineButtonText}>Cancel Appointment</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <Text style={local.stateText}>Appointment details are unavailable.</Text>
+        )}
+      </Content>
+    </Screen>
+  );
+}
+
+export function ReceptionWaitingRoomScreen({ navigation }: any) {
+  const [items, setItems] = useState<ReceptionAppointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setItems(await getReceptionWaitingRoom());
+    } catch (loadError: any) {
+      console.error('[Reception Waiting Room] Load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load waiting room.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return (
+    <Screen>
+      <Content>
+        <Header title="Waiting Room" subtitle="Checked-in patients" navigation={navigation} />
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity style={local.stateCard} onPress={load}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
+        {!loading && !error && items.length === 0 ? <Text style={local.stateText}>No patients currently waiting.</Text> : null}
+        {items.map((item) => (
+          <ListRow key={item.id} title={item.patients?.name || 'Patient'} subtitle={`${item.doctors?.name || 'Doctor'} - ${item.status}`} meta={new Date(item.appointment_date).toLocaleString()} status={`#${item.queuePosition}`} icon="time-outline" tone={item.status === 'In Consultation' ? colors.green : colors.orange} onPress={() => navigation.navigate('ReceptionAppointmentDetail', { appointment: item })} />
+        ))}
+      </Content>
+    </Screen>
+  );
+}
+
+export function ReceptionBillingScreen({ navigation }: any) {
+  const [items, setItems] = useState<ReceptionInvoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setItems(await getReceptionInvoices());
+    } catch (loadError: any) {
+      console.error('[Reception Billing] Load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load invoices.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return (
+    <Screen>
+      <Content>
+        <Header title="Billing" subtitle="Invoices and payments" navigation={navigation} />
+        <TouchableOpacity style={local.secondaryButton} onPress={() => navigation.getParent()?.navigate('ReceptionInvoiceForm')}>
+          <Text style={local.secondaryButtonText}>Generate Invoice</Text>
+        </TouchableOpacity>
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity style={local.stateCard} onPress={load}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
+        {!loading && !error && items.length === 0 ? <Text style={local.stateText}>No invoices found.</Text> : null}
+        {items.map((item) => (
+          <ListRow key={item.id} title={item.invoice_number} subtitle={item.patients?.name || 'Patient'} meta={`${item.total_amount} due ${item.due_date}`} status={item.status} icon="cash-outline" tone={item.status === 'Paid' ? colors.green : item.status === 'Refunded' ? colors.purple : colors.orange} onPress={() => navigation.getParent()?.navigate('ReceptionInvoicePayment', { invoice: item })} />
+        ))}
+      </Content>
+    </Screen>
+  );
+}
+
+export function ReceptionInvoiceFormScreen({ navigation }: any) {
+  const [patientsList, setPatientsList] = useState<ReceptionPatient[]>([]);
+  const [patientId, setPatientId] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [itemName, setItemName] = useState('Consultation');
+  const [amount, setAmount] = useState('');
+  const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    getReceptionPatients().then((list) => {
+      setPatientsList(list);
+      if (list[0]) setPatientId(list[0].id);
+    }).catch((error) => {
+      console.error('[Reception Invoice Form] Patients load error:', error.response?.data || error.message);
+      setIsError(true);
+      setMessage('Unable to load patients.');
+    });
+  }, []);
+
+  const save = async () => {
+    try {
+      setSaving(true);
+      setMessage('');
+      await createReceptionInvoice({
+        patient_id: patientId,
+        due_date: dueDate,
+        items: [{ item_name: itemName || 'Service', quantity: 1, unit_price: Number(amount) || 0 }]
+      });
+      setIsError(false);
+      setMessage('Invoice generated.');
+    } catch (error: any) {
+      console.error('[Reception Invoice Form] Save error:', error.response?.data || error.message);
+      setIsError(true);
+      setMessage(error.response?.data?.message || 'Unable to generate invoice.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Screen>
+      <Content>
+        <Header title="Generate Invoice" subtitle="Billing details" navigation={navigation} />
+        <SectionHeader title="Patient" />
+        <View style={local.chipRow}>
+          {patientsList.slice(0, 20).map((patient) => (
+            <TouchableOpacity key={patient.id} style={[local.chip, patientId === patient.id && local.chipActive]} onPress={() => setPatientId(patient.id)}>
+              <Text style={[local.chipText, patientId === patient.id && local.chipTextActive]}>{patient.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={local.formCard}>
+          <TextInput placeholder="Due date, e.g. 2026-06-30" placeholderTextColor="#8b97a8" value={dueDate} onChangeText={setDueDate} style={local.input} />
+          <TextInput placeholder="Item name" placeholderTextColor="#8b97a8" value={itemName} onChangeText={setItemName} style={local.input} />
+          <TextInput placeholder="Amount" placeholderTextColor="#8b97a8" value={amount} onChangeText={setAmount} style={local.input} keyboardType="numeric" />
+          {message ? <Text style={isError ? local.errorText : local.successText}>{message}</Text> : null}
+          <TouchableOpacity disabled={saving || !patientId || !dueDate} style={local.secondaryButton} onPress={save}>
+            <Text style={local.secondaryButtonText}>{saving ? 'Saving...' : 'Create Invoice'}</Text>
+          </TouchableOpacity>
+        </View>
+      </Content>
+    </Screen>
+  );
+}
+
+export function ReceptionInvoicePaymentScreen({ navigation, route }: any) {
+  const invoice = route.params?.invoice as ReceptionInvoice | undefined;
+  const [amount, setAmount] = useState(invoice?.total_amount ? String(invoice.total_amount) : '');
+  const [method, setMethod] = useState('Cash');
+  const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!invoice) return;
+    try {
+      setSaving(true);
+      setMessage('');
+      await recordReceptionPayment(invoice.id, { amount, payment_method: method });
+      setIsError(false);
+      setMessage('Payment recorded.');
+    } catch (error: any) {
+      console.error('[Reception Payment] Save error:', error.response?.data || error.message);
+      setIsError(true);
+      setMessage(error.response?.data?.message || 'Unable to record payment.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Screen>
+      <Content>
+        <Header title="Record Payment" subtitle={invoice?.invoice_number || 'Invoice'} navigation={navigation} />
+        {invoice ? (
+          <>
+            <ListRow title={invoice.patients?.name || 'Patient'} subtitle={invoice.status} meta={`${invoice.total_amount} due ${invoice.due_date}`} icon="cash-outline" tone={colors.orange} />
+            <View style={local.chipRow}>
+              {['Cash', 'Card', 'Insurance', 'Bank Transfer'].map((item) => (
+                <TouchableOpacity key={item} style={[local.chip, method === item && local.chipActive]} onPress={() => setMethod(item)}>
+                  <Text style={[local.chipText, method === item && local.chipTextActive]}>{item}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={local.formCard}>
+              <TextInput placeholder="Payment amount" placeholderTextColor="#8b97a8" value={amount} onChangeText={setAmount} style={local.input} keyboardType="numeric" />
+              {message ? <Text style={isError ? local.errorText : local.successText}>{message}</Text> : null}
+              <TouchableOpacity disabled={saving || !amount} style={local.secondaryButton} onPress={save}>
+                <Text style={local.secondaryButtonText}>{saving ? 'Saving...' : 'Record Payment'}</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <Text style={local.stateText}>Invoice details are unavailable.</Text>
+        )}
+      </Content>
+    </Screen>
+  );
+}
+
+// ── Patient workflow: appointments, booking, records, laboratory results, and self-service profile data. ──
+export function PatientAppointmentsScreen({ navigation }: any) {
+  const [items, setItems] = useState<PatientAppointment[]>([]);
+  const [view, setView] = useState<'upcoming' | 'past'>('upcoming');
+  const [status, setStatus] = useState('All');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setItems(await getPatientAppointments({ view, status: status === 'All' ? undefined : status }));
+    } catch (loadError: any) {
+      console.error('[Patient Appointments] Load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load appointments.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, [view, status]);
+
+  return (
+    <Screen>
+      <Content>
+        <Header title="Appointments" subtitle="Your visits" navigation={navigation} />
+        <TouchableOpacity style={local.secondaryButton} onPress={() => navigation.getParent()?.navigate('PatientBookAppointment')}>
+          <Text style={local.secondaryButtonText}>Book Appointment</Text>
+        </TouchableOpacity>
+        <View style={local.chipRow}>
+          {['upcoming', 'past'].map((item) => (
+            <TouchableOpacity key={item} style={[local.chip, view === item && local.chipActive]} onPress={() => setView(item as any)}>
+              <Text style={[local.chipText, view === item && local.chipTextActive]}>{item === 'upcoming' ? 'Upcoming' : 'Past'}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={local.chipRow}>
+          {['All', ...appointmentStatuses].map((item) => (
+            <TouchableOpacity key={item} style={[local.chip, status === item && local.chipActive]} onPress={() => setStatus(item)}>
+              <Text style={[local.chipText, status === item && local.chipTextActive]}>{item}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity style={local.stateCard} onPress={load}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
+        {!loading && !error && items.length === 0 ? <Text style={local.stateText}>No appointments found.</Text> : null}
+        {items.map((item) => (
+          <ListRow
+            key={item.id}
+            title={item.doctors?.name || 'Doctor'}
+            subtitle={item.doctors?.specialization || item.status}
+            meta={new Date(item.appointment_date).toLocaleString()}
+            status={item.status}
+            tone={item.status === 'Completed' ? colors.green : item.status === 'Cancelled' ? colors.red : colors.blue}
+            icon="calendar-outline"
+            onPress={() => navigation.getParent()?.navigate('PatientAppointmentDetail', { appointment: item })}
+          />
+        ))}
+      </Content>
+    </Screen>
+  );
+}
+
+export function PatientAppointmentDetailScreen({ navigation, route }: any) {
+  const [appointment, setAppointment] = useState<PatientAppointment | null>(route.params?.appointment || null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const cancel = async () => {
+    if (!appointment) return;
+    try {
+      setSaving(true);
+      setError('');
+      setSuccess('');
+      const updated = await cancelPatientAppointment(appointment.id);
+      setAppointment(updated);
+      setSuccess('Appointment cancelled.');
+    } catch (cancelError: any) {
+      console.error('[Patient Appointment] Cancel error:', cancelError.response?.data || cancelError.message);
+      setError(cancelError.response?.data?.message || 'Unable to cancel appointment.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Screen>
+      <Content>
+        <Header title="Appointment" subtitle={appointment?.doctors?.name || 'Details'} navigation={navigation} />
+        {appointment ? (
+          <>
+            <ListRow title={appointment.doctors?.name || 'Doctor'} subtitle={appointment.doctors?.specialization || 'Specialist'} meta={new Date(appointment.appointment_date).toLocaleString()} status={appointment.status} icon="medical-outline" tone={colors.blue} />
+            <ListRow title="Patient Notes" subtitle={appointment.notes || 'No notes added'} icon="document-text-outline" tone={colors.purple} />
+            <ListRow title="Doctor Notes" subtitle={appointment.doctor_notes || 'Not available yet'} icon="clipboard-outline" tone={colors.teal} />
+            {error ? <Text style={local.errorText}>{error}</Text> : null}
+            {success ? <Text style={local.successText}>{success}</Text> : null}
+            {!['Completed', 'Cancelled', 'No Show'].includes(appointment.status) ? (
+              <TouchableOpacity disabled={saving} style={local.outlineButton} onPress={cancel}>
+                <Text style={local.outlineButtonText}>{saving ? 'Cancelling...' : 'Cancel Appointment'}</Text>
+              </TouchableOpacity>
+            ) : null}
+          </>
+        ) : (
+          <Text style={local.stateText}>Appointment details are unavailable.</Text>
+        )}
+      </Content>
+    </Screen>
+  );
+}
+
+export function PatientBookAppointmentScreen({ navigation }: any) {
+  const [doctorsList, setDoctorsList] = useState<any[]>([]);
+  const [doctorId, setDoctorId] = useState('');
+  const [appointmentDate, setAppointmentDate] = useState('');
+  const [notes, setNotes] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const loadDoctors = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const list = await getDoctorsForBooking();
+      setDoctorsList(list);
+      if (!doctorId && list[0]) setDoctorId(list[0].id);
+    } catch (loadError: any) {
+      console.error('[Patient Booking] Doctors load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load doctors.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submit = async () => {
+    try {
+      setSaving(true);
+      setError('');
+      setSuccess('');
+      await bookPatientAppointment({ doctor_id: doctorId, appointment_date: appointmentDate, notes });
+      setSuccess('Appointment booked successfully.');
+    } catch (saveError: any) {
+      console.error('[Patient Booking] Save error:', saveError.response?.data || saveError.message);
+      setError(saveError.response?.data?.message || 'Unable to book appointment.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDoctors();
+  }, []);
+
+  return (
+    <Screen>
+      <Content>
+        <Header title="Book Appointment" subtitle="Select doctor and time" navigation={navigation} />
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity style={local.stateCard} onPress={loadDoctors}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
+        {!loading && doctorsList.length === 0 ? <Text style={local.stateText}>No doctors available for booking.</Text> : null}
+        <SectionHeader title="Doctor" />
+        <View style={local.chipRow}>
+          {doctorsList.map((doctor) => (
+            <TouchableOpacity key={doctor.id} style={[local.chip, doctorId === doctor.id && local.chipActive]} onPress={() => setDoctorId(doctor.id)}>
+              <Text style={[local.chipText, doctorId === doctor.id && local.chipTextActive]}>{doctor.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={local.formCard}>
+          <TextInput value={appointmentDate} onChangeText={setAppointmentDate} placeholder="Appointment date, e.g. 2026-06-20T10:00:00+03:00" placeholderTextColor="#8b97a8" style={local.input} />
+          <TextInput value={notes} onChangeText={setNotes} placeholder="Notes for the clinic" placeholderTextColor="#8b97a8" style={[local.input, local.textArea]} multiline />
+          {success ? <Text style={local.successText}>{success}</Text> : null}
+          <TouchableOpacity disabled={saving || !doctorId || !appointmentDate} style={local.secondaryButton} onPress={submit}>
+            <Text style={local.secondaryButtonText}>{saving ? 'Booking...' : 'Confirm Booking'}</Text>
+          </TouchableOpacity>
+        </View>
+      </Content>
+    </Screen>
+  );
+}
+
+export function PatientRecordsScreen({ navigation }: any) {
+  const [records, setRecords] = useState<PatientRecordsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setRecords(await getPatientRecords());
+    } catch (loadError: any) {
+      console.error('[Patient Records] Load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load medical records.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const profile = records?.profile;
+
+  return (
+    <Screen>
+      <Content>
+        <Header title="Medical Records" subtitle="Your health history" navigation={navigation} />
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity style={local.stateCard} onPress={load}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
+        {profile ? (
+          <>
+            <SectionHeader title="Profile" />
+            <ListRow title={profile.name || 'Patient'} subtitle={`${profile.gender || 'Unspecified'} - ${profile.blood_type || 'No blood type'}`} meta={profile.email || profile.phone || ''} icon="person-outline" tone={colors.teal} />
+            <ListRow title="Allergies" subtitle={profile.allergies || 'None recorded'} icon="alert-circle-outline" tone={colors.orange} />
+            <ListRow title="Medical Conditions" subtitle={profile.medical_conditions || 'None recorded'} icon="medical-outline" tone={colors.red} />
+            <ListRow title="Emergency Contact" subtitle={profile.emergency_contact || 'Not recorded'} icon="call-outline" tone={colors.green} />
+          </>
+        ) : null}
+        <SectionHeader title="Appointment History" />
+        {!loading && !error && records?.appointmentHistory.length === 0 ? <Text style={local.stateText}>No appointment history found.</Text> : null}
+        {records?.appointmentHistory.map((item) => (
+          <ListRow key={item.id} title={item.doctors?.name || 'Doctor'} subtitle={item.doctor_notes || item.status} meta={new Date(item.appointment_date).toLocaleString()} status={item.status} icon="calendar-outline" tone={colors.blue} onPress={() => navigation.getParent()?.navigate('PatientAppointmentDetail', { appointment: item })} />
+        ))}
+      </Content>
+    </Screen>
+  );
+}
+
+export function PatientLabResultsScreen({ navigation }: any) {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setItems(await getPatientLabResults());
+    } catch (loadError: any) {
+      console.error('[Patient Lab Results] Load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load lab results.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return (
+    <Screen>
+      <Content>
+        <Header title="Lab Results" subtitle="Tests linked to your record" navigation={navigation} />
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity style={local.stateCard} onPress={load}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
+        {!loading && !error && items.length === 0 ? <Text style={local.stateText}>No lab results found.</Text> : null}
+        {items.map((item) => (
+          <ListRow key={item.id} title={item.test_name} subtitle={item.result || item.status} meta={item.doctors?.name || new Date(item.created_at).toLocaleString()} status={item.status} icon="flask-outline" tone={item.status === 'Completed' ? colors.green : item.status === 'Cancelled' ? colors.red : colors.blue} />
+        ))}
+      </Content>
+    </Screen>
+  );
+}
+
+// ── Doctor workflow: appointment decisions, assigned-patient context, clinical notes, and lab requests. ──
+export function DoctorAppointmentsScreen({ navigation }: any) {
+  const [items, setItems] = useState<DoctorAppointment[]>([]);
+  const [view, setView] = useState<'today' | 'upcoming'>('today');
+  const [status, setStatus] = useState('All');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setItems(await getDoctorAppointments({ view, status: status === 'All' ? undefined : status }));
+    } catch (loadError: any) {
+      console.error('[Doctor Appointments] Load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load appointments.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, [view, status]);
+
+  return (
+    <Screen>
+      <Content>
+        <Header title="Schedule" subtitle="Appointments" navigation={navigation} />
+        <View style={local.chipRow}>
+          {['today', 'upcoming'].map((item) => (
+            <TouchableOpacity key={item} style={[local.chip, view === item && local.chipActive]} onPress={() => setView(item as any)}>
+              <Text style={[local.chipText, view === item && local.chipTextActive]}>{item === 'today' ? 'Today' : 'Upcoming'}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={local.chipRow}>
+          {['All', ...appointmentStatuses].map((item) => (
+            <TouchableOpacity key={item} style={[local.chip, status === item && local.chipActive]} onPress={() => setStatus(item)}>
+              <Text style={[local.chipText, status === item && local.chipTextActive]}>{item}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity style={local.stateCard} onPress={load}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
+        {!loading && !error && items.length === 0 ? <Text style={local.stateText}>No appointments found.</Text> : null}
+        {items.map((item) => (
+          <ListRow
+            key={item.id}
+            title={item.patients?.name || 'Patient'}
+            subtitle={item.status}
+            meta={new Date(item.appointment_date).toLocaleString()}
+            status={item.status}
+            tone={item.status === 'Completed' ? colors.green : item.status === 'Cancelled' ? colors.red : colors.blue}
+            icon="calendar-outline"
+            onPress={() => navigation.getParent()?.navigate('DoctorAppointmentDetail', { id: item.id })}
+          />
+        ))}
+      </Content>
+    </Screen>
+  );
+}
+
+export function DoctorPatientsScreen({ navigation }: any) {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setItems(await getDoctorPatients());
+    } catch (loadError: any) {
+      console.error('[Doctor Patients] Load error:', loadError.response?.data || loadError.message);
+      setError(loadError.response?.data?.message || 'Unable to load assigned patients.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return (
+    <Screen>
+      <Content>
+        <Header title="Patients" subtitle="Assigned patients" navigation={navigation} />
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? (
+          <TouchableOpacity style={local.stateCard} onPress={load}>
+            <Text style={local.errorText}>{error}</Text>
+            <Text style={local.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
+        ) : null}
+        {!loading && !error && items.length === 0 ? <Text style={local.stateText}>No assigned patients found.</Text> : null}
+        {items.map((item) => (
+          <ListRow
+            key={item.id}
+            title={item.name}
+            subtitle={`${item.gender || 'Unspecified'} - ${item.blood_type || 'No blood type'}`}
+            meta={item.email || item.phone || ''}
+            icon="person-outline"
+            tone={colors.teal}
+            onPress={() => navigation.getParent()?.navigate('DoctorPatientDetail', { id: item.id })}
+          />
+        ))}
+      </Content>
+    </Screen>
+  );
+}
+
+// ── Administrative workflow: management shortcuts, user lifecycle, and staff availability. ──
 export function ManagementScreen({ navigation, route }: any) {
   const role = getRole(route);
   const openModule = (title: string) => {
@@ -570,6 +1891,210 @@ export function ActiveStaffScreen({ navigation }: any) {
   );
 }
 
+export function DoctorAppointmentDetailScreen({ navigation, route }: any) {
+  const [item, setItem] = useState<DoctorAppointment | null>(null);
+  const [notes, setNotes] = useState('');
+  const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const id = route.params?.id;
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const data = await getDoctorAppointment(id);
+      setItem(data);
+      setNotes(data.doctor_notes || '');
+      setMessage('');
+    } catch (loadError: any) {
+      setIsError(true);
+      setMessage(loadError.response?.data?.message || 'Unable to load appointment.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, [id]);
+
+  const changeStatus = async (status: AppointmentStatus) => {
+    try {
+      setItem(await updateDoctorAppointmentStatus(id, status));
+      setIsError(false);
+      setMessage('Status updated.');
+    } catch (error: any) {
+      setIsError(true);
+      setMessage(error.response?.data?.message || 'Unable to update status.');
+    }
+  };
+
+  const saveNotes = async (complete = false) => {
+    try {
+      setItem(await updateDoctorAppointmentNotes(id, notes, complete));
+      setIsError(false);
+      setMessage(complete ? 'Consultation completed.' : 'Notes saved.');
+    } catch (error: any) {
+      setIsError(true);
+      setMessage(error.response?.data?.message || 'Unable to save notes.');
+    }
+  };
+
+  return (
+    <Screen>
+      <Content>
+        <Header title="Appointment" subtitle={item?.patients?.name || 'Consultation'} navigation={navigation} />
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {item ? (
+          <>
+            <ListRow title={item.patients?.name || 'Patient'} subtitle={item.status} meta={new Date(item.appointment_date).toLocaleString()} icon="calendar-outline" tone={colors.blue} />
+            <View style={local.chipRow}>
+              {appointmentStatuses.map((status) => (
+                <TouchableOpacity key={status} style={[local.chip, item.status === status && local.chipActive]} onPress={() => changeStatus(status)}>
+                  <Text style={[local.chipText, item.status === status && local.chipTextActive]}>{status}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={local.formCard}>
+              <TextInput multiline placeholder="Doctor notes" placeholderTextColor="#8b97a8" value={notes} onChangeText={setNotes} style={[local.input, local.textArea]} editable={item.status !== 'Completed'} />
+              {message ? <Text style={isError ? local.errorText : local.successText}>{message}</Text> : null}
+              <TouchableOpacity style={local.secondaryButton} onPress={() => saveNotes(false)} disabled={item.status === 'Completed'}>
+                <Text style={local.secondaryButtonText}>Save Notes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={local.outlineButton} onPress={() => saveNotes(true)}>
+                <Text style={local.outlineButtonText}>Mark Consultation Completed</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : null}
+      </Content>
+    </Screen>
+  );
+}
+
+export function DoctorPatientDetailScreen({ navigation, route }: any) {
+  const [detail, setDetail] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const id = route.params?.id;
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setDetail(await getDoctorPatient(id));
+    } catch (loadError: any) {
+      setError(loadError.response?.data?.message || 'Unable to load patient.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, [id]);
+
+  const patient = detail?.patient;
+  return (
+    <Screen>
+      <Content>
+        <Header title="Patient Profile" subtitle={patient?.name || 'Assigned patient'} navigation={navigation} />
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {error ? <Text style={local.errorText}>{error}</Text> : null}
+        {patient ? (
+          <>
+            <ListRow title={patient.name} subtitle={`${patient.gender || 'Unspecified'} - ${patient.blood_type || 'No blood type'}`} meta={patient.email || patient.phone || ''} icon="person-outline" tone={colors.teal} />
+            <ListRow title="Allergies" subtitle={patient.allergies || 'None recorded'} icon="alert-circle-outline" tone={colors.orange} />
+            <ListRow title="Medical Conditions" subtitle={patient.medical_conditions || 'None recorded'} icon="medical-outline" tone={colors.red} />
+            <ListRow title="Emergency Contact" subtitle={patient.emergency_contact || 'Not available'} icon="call-outline" tone={colors.green} />
+            <SectionHeader title="Appointment History" />
+            {(detail.appointmentHistory || []).map((appointment: DoctorAppointment) => (
+              <ListRow key={appointment.id} title={new Date(appointment.appointment_date).toLocaleString()} subtitle={appointment.status} meta={appointment.doctor_notes || appointment.notes || ''} icon="calendar-outline" tone={appointment.status === 'Completed' ? colors.green : colors.blue} />
+            ))}
+          </>
+        ) : null}
+      </Content>
+    </Screen>
+  );
+}
+
+export function DoctorLabTestsScreen({ navigation }: any) {
+  const [items, setItems] = useState<DoctorLabTest[]>([]);
+  const [patientsList, setPatientsList] = useState<any[]>([]);
+  const [patientId, setPatientId] = useState('');
+  const [testName, setTestName] = useState('');
+  const [status, setStatus] = useState('All');
+  const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setItems(await getDoctorLabTests(status === 'All' ? undefined : status));
+      const assigned = await getDoctorPatients();
+      setPatientsList(assigned);
+      if (!patientId && assigned[0]) setPatientId(assigned[0].id);
+    } catch (loadError: any) {
+      setIsError(true);
+      setMessage(loadError.response?.data?.message || 'Unable to load lab requests.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, [status]);
+
+  const create = async () => {
+    try {
+      await createDoctorLabTest({ patient_id: patientId, test_name: testName });
+      setTestName('');
+      setIsError(false);
+      setMessage('Lab request created.');
+      await load();
+    } catch (error: any) {
+      setIsError(true);
+      setMessage(error.response?.data?.message || 'Unable to create lab request.');
+    }
+  };
+
+  return (
+    <Screen>
+      <Content>
+        <Header title="Lab Requests" subtitle="Doctor requests" navigation={navigation} />
+        <View style={local.formCard}>
+          <View style={local.chipRow}>
+            {patientsList.map((patient) => (
+              <TouchableOpacity key={patient.id} style={[local.chip, patientId === patient.id && local.chipActive]} onPress={() => setPatientId(patient.id)}>
+                <Text style={[local.chipText, patientId === patient.id && local.chipTextActive]}>{patient.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TextInput placeholder="Test name" placeholderTextColor="#8b97a8" value={testName} onChangeText={setTestName} style={local.input} />
+          <TouchableOpacity style={local.secondaryButton} onPress={create}>
+            <Text style={local.secondaryButtonText}>Create Lab Request</Text>
+          </TouchableOpacity>
+        </View>
+        {message ? <Text style={isError ? local.errorText : local.successText}>{message}</Text> : null}
+        <View style={local.chipRow}>
+          {labStatuses.map((item) => (
+            <TouchableOpacity key={item} style={[local.chip, status === item && local.chipActive]} onPress={() => setStatus(item)}>
+              <Text style={[local.chipText, status === item && local.chipTextActive]}>{item}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {loading ? <ActivityIndicator color={colors.teal} /> : null}
+        {!loading && items.length === 0 ? <Text style={local.stateText}>No lab requests found.</Text> : null}
+        {items.map((item) => (
+          <ListRow key={item.id} title={item.test_name} subtitle={item.patients?.name || 'Patient'} meta={new Date(item.created_at).toLocaleString()} status={item.status} icon="flask-outline" tone={item.status === 'Completed' ? colors.green : item.status === 'Cancelled' ? colors.red : colors.blue} />
+        ))}
+      </Content>
+    </Screen>
+  );
+}
+
 export function ReportsScreen({ navigation }: any) {
   return (
     <Screen>
@@ -596,6 +2121,7 @@ export function NotificationsScreen({ navigation }: any) {
   );
 }
 
+// ── Shared self-service screens: profile, credential, preference, support, and generic module detail views. ──
 export function ProfileScreen({ navigation, route }: any) {
   const role = getRole(route);
   const [profile, setProfile] = useState<any>({ ...roleProfiles[role], ...(route?.params?.user || {}) });
@@ -603,12 +2129,39 @@ export function ProfileScreen({ navigation, route }: any) {
   const [profileError, setProfileError] = useState('');
 
   useEffect(() => {
+    // Fetch the base account first, then merge role-specific profile fields only when the role supports them.
     const loadProfile = async () => {
       setLoadingProfile(true);
       setProfileError('');
       const current = await getCurrentUserProfile();
       if (current) {
-        setProfile({ ...roleProfiles[current.role], ...current });
+        if (current.role === 'Doctor') {
+          try {
+            const doctorProfile = await getDoctorProfile();
+            setProfile({ ...roleProfiles[current.role], ...current, ...doctorProfile });
+          } catch (error: any) {
+            console.error('[Doctor Profile] Load error:', error.response?.data || error.message);
+            setProfile({ ...roleProfiles[current.role], ...current });
+          }
+        } else if (current.role === 'Patient') {
+          try {
+            const patientProfile = await getPatientProfile();
+            setProfile({ ...roleProfiles[current.role], ...current, ...patientProfile });
+          } catch (error: any) {
+            console.error('[Patient Profile] Load error:', error.response?.data || error.message);
+            setProfile({ ...roleProfiles[current.role], ...current });
+          }
+        } else if (current.role === 'Receptionist') {
+          try {
+            const receptionistProfile = await getReceptionProfile();
+            setProfile({ ...roleProfiles[current.role], ...current, ...receptionistProfile });
+          } catch (error: any) {
+            console.error('[Reception Profile] Load error:', error.response?.data || error.message);
+            setProfile({ ...roleProfiles[current.role], ...current });
+          }
+        } else {
+          setProfile({ ...roleProfiles[current.role], ...current });
+        }
       } else {
         setProfileError('Unable to load profile.');
       }
@@ -634,6 +2187,8 @@ export function ProfileScreen({ navigation, route }: any) {
           <Text style={local.profileName}>{profile.name}</Text>
           <Text style={local.profileMeta}>{profile.email}</Text>
           <Text style={local.profileMeta}>{profile.role} - {profile.is_active === false ? 'Inactive' : 'Active'}</Text>
+          {profile.role === 'Doctor' ? <Text style={local.profileMeta}>{profile.specialization || 'General Practice'} - {profile.is_available === false ? 'Unavailable' : 'Available'}</Text> : null}
+          {profile.role === 'Patient' ? <Text style={local.profileMeta}>{profile.blood_type || 'Blood type not recorded'}</Text> : null}
         </View>
         <ListRow title="Profile Information" subtitle={`${profile.department} - ${profile.role || role}`} icon="person-outline" tone={colors.teal} onPress={() => navigation.getParent()?.navigate('ProfileInformation', { profile, role: profile.role || role })} />
         <ListRow title="Change Password" subtitle="Update your login credentials" icon="lock-closed-outline" tone={colors.blue} onPress={() => navigation.getParent()?.navigate('ChangePassword', { profile, role })} />
@@ -652,14 +2207,108 @@ export function ProfileScreen({ navigation, route }: any) {
 export function ProfileInformationScreen({ navigation, route }: any) {
   const profile = route.params?.profile || {};
   const role = route.params?.role || 'Admin';
+  const [form, setForm] = useState({
+    name: profile.name || '',
+    email: profile.email || '',
+    phone: profile.phone || '',
+    gender: profile.gender || '',
+    date_of_birth: profile.date_of_birth || '',
+    blood_type: profile.blood_type || '',
+    emergency_contact: profile.emergency_contact || '',
+    insurance_provider: profile.insurance_provider || '',
+    allergies: profile.allergies || '',
+    medical_conditions: profile.medical_conditions || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+
+  const updateField = (field: keyof typeof form, value: string) => setForm((current) => ({ ...current, [field]: value }));
+
+  const savePatientProfile = async () => {
+    try {
+      setSaving(true);
+      setMessage('');
+      await updatePatientProfile(form);
+      setIsError(false);
+      setMessage('Profile updated.');
+    } catch (error: any) {
+      console.error('[Patient Profile] Update error:', error.response?.data || error.message);
+      setIsError(true);
+      setMessage(error.response?.data?.message || 'Unable to update profile.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveReceptionProfile = async () => {
+    try {
+      setSaving(true);
+      setMessage('');
+      await updateReceptionProfile({ name: form.name, email: form.email });
+      setIsError(false);
+      setMessage('Profile updated.');
+    } catch (error: any) {
+      console.error('[Reception Profile] Update error:', error.response?.data || error.message);
+      setIsError(true);
+      setMessage(error.response?.data?.message || 'Unable to update profile.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Screen>
       <Content>
         <Header title="Profile Information" subtitle={`${profile.department || 'Operations'} - ${role}`} navigation={navigation} />
+        {role === 'Patient' ? (
+          <View style={local.formCard}>
+            <TextInput placeholder="Name" placeholderTextColor="#8b97a8" value={form.name} onChangeText={(value) => updateField('name', value)} style={local.input} />
+            <TextInput placeholder="Email" placeholderTextColor="#8b97a8" value={form.email} onChangeText={(value) => updateField('email', value)} style={local.input} autoCapitalize="none" />
+            <TextInput placeholder="Phone" placeholderTextColor="#8b97a8" value={form.phone} onChangeText={(value) => updateField('phone', value)} style={local.input} />
+            <TextInput placeholder="Gender" placeholderTextColor="#8b97a8" value={form.gender} onChangeText={(value) => updateField('gender', value)} style={local.input} />
+            <TextInput placeholder="Date of birth" placeholderTextColor="#8b97a8" value={form.date_of_birth} onChangeText={(value) => updateField('date_of_birth', value)} style={local.input} />
+            <TextInput placeholder="Blood type" placeholderTextColor="#8b97a8" value={form.blood_type} onChangeText={(value) => updateField('blood_type', value)} style={local.input} />
+            <TextInput placeholder="Emergency contact" placeholderTextColor="#8b97a8" value={form.emergency_contact} onChangeText={(value) => updateField('emergency_contact', value)} style={local.input} />
+            <TextInput placeholder="Insurance provider" placeholderTextColor="#8b97a8" value={form.insurance_provider} onChangeText={(value) => updateField('insurance_provider', value)} style={local.input} />
+            <TextInput placeholder="Allergies" placeholderTextColor="#8b97a8" value={form.allergies} onChangeText={(value) => updateField('allergies', value)} style={[local.input, local.textArea]} multiline />
+            <TextInput placeholder="Medical conditions" placeholderTextColor="#8b97a8" value={form.medical_conditions} onChangeText={(value) => updateField('medical_conditions', value)} style={[local.input, local.textArea]} multiline />
+            {message ? <Text style={isError ? local.errorText : local.successText}>{message}</Text> : null}
+            <TouchableOpacity activeOpacity={0.82} style={local.secondaryButton} onPress={savePatientProfile} disabled={saving}>
+              <Text style={local.secondaryButtonText}>{saving ? 'Saving...' : 'Save Profile'}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+        {role === 'Receptionist' ? (
+          <View style={local.formCard}>
+            <TextInput placeholder="Name" placeholderTextColor="#8b97a8" value={form.name} onChangeText={(value) => updateField('name', value)} style={local.input} />
+            <TextInput placeholder="Email" placeholderTextColor="#8b97a8" value={form.email} onChangeText={(value) => updateField('email', value)} style={local.input} autoCapitalize="none" />
+            {message ? <Text style={isError ? local.errorText : local.successText}>{message}</Text> : null}
+            <TouchableOpacity activeOpacity={0.82} style={local.secondaryButton} onPress={saveReceptionProfile} disabled={saving}>
+              <Text style={local.secondaryButtonText}>{saving ? 'Saving...' : 'Save Profile'}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
         <ListRow title="Name" subtitle={profile.name || 'Not available'} icon="person-outline" tone={colors.teal} />
         <ListRow title="Email" subtitle={profile.email || 'Not available'} icon="mail-outline" tone={colors.blue} />
         <ListRow title="Phone" subtitle={profile.phone || 'Not available'} icon="call-outline" tone={colors.green} />
         <ListRow title="Role" subtitle={role} icon="shield-checkmark-outline" tone={colors.purple} />
+        {role === 'Patient' ? (
+          <>
+            <ListRow title="Gender" subtitle={profile.gender || 'Not available'} icon="person-circle-outline" tone={colors.teal} />
+            <ListRow title="DOB" subtitle={profile.date_of_birth || 'Not available'} icon="calendar-outline" tone={colors.blue} />
+            <ListRow title="Blood Type" subtitle={profile.blood_type || 'Not available'} icon="water-outline" tone={colors.red} />
+            <ListRow title="Emergency Contact" subtitle={profile.emergency_contact || 'Not available'} icon="call-outline" tone={colors.green} />
+            <ListRow title="Insurance Provider" subtitle={profile.insurance_provider || 'Not available'} icon="card-outline" tone={colors.orange} />
+          </>
+        ) : null}
+        {role === 'Doctor' ? (
+          <>
+            <ListRow title="Specialization" subtitle={profile.specialization || 'Not available'} icon="medical-outline" tone={colors.blue} />
+            <ListRow title="Consultation Fee" subtitle={profile.consultation_fee ? `${profile.consultation_fee}` : 'Not available'} icon="cash-outline" tone={colors.orange} />
+            <ListRow title="Availability" subtitle={profile.is_available === false ? 'Unavailable' : 'Available'} icon="pulse-outline" tone={profile.is_available === false ? colors.red : colors.green} />
+          </>
+        ) : null}
       </Content>
     </Screen>
   );
@@ -821,6 +2470,11 @@ const local = StyleSheet.create({
     paddingHorizontal: 14,
     color: colors.ink,
     backgroundColor: colors.surface,
+  },
+  textArea: {
+    minHeight: 120,
+    textAlignVertical: 'top',
+    paddingTop: 12,
   },
   chipRow: {
     flexDirection: 'row',

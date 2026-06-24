@@ -1,3 +1,4 @@
+// Placeholder report screen; it describes future clinical-report functionality rather than loading live records.
 import React from 'react';
 import { StyleSheet, View, Text, SafeAreaView } from 'react-native';
 

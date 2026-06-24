@@ -1,3 +1,4 @@
+// Legacy appointment roster. It retains local fallback records for offline demonstrations.
 import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
@@ -16,7 +17,7 @@ import { getCurrentUser, logout } from '../../services/authService';
 interface Appointment {
   id: string;
   appointment_date: string;
-  status: 'Scheduled' | 'Completed' | 'Cancelled';
+  status: string;
   patient_name: string;
   physician_name: string;
   reason: string;
@@ -37,12 +38,21 @@ export default function AppointmentRosterScreen({ navigation }: { navigation: an
     fetchAppointments();
   }, []);
 
+  // Attempt the shared API first; fallback data keeps this legacy preview usable without a server.
   const fetchAppointments = async () => {
     setLoading(true);
     try {
       const response = await api.get('/appointments');
       if (response.data && response.data.success) {
-        setAppointments(response.data.data);
+        setAppointments((response.data.data || []).map((appointment: any) => ({
+          id: appointment.id,
+          appointment_date: appointment.appointment_date,
+          status: appointment.status,
+          patient_name: appointment.patients?.name || 'Unknown patient',
+          physician_name: appointment.doctors?.name || 'Unassigned doctor',
+          reason: appointment.notes || 'General consultation',
+          doctor_notes: appointment.doctor_notes || '',
+        })));
       }
     } catch (error) {
       console.warn('[Appointments Screen] Failed to fetch appointments from API. Using local fallbacks.');
@@ -76,6 +86,7 @@ export default function AppointmentRosterScreen({ navigation }: { navigation: an
     navigation.replace('Login');
   };
 
+  // Optimistically remove the row even when this demonstration screen is working from fallback data.
   const handleDelete = async (id: string) => {
     try {
       await api.delete(`/appointments/${id}`);

@@ -1,5 +1,6 @@
+// Authentication lifecycle: credential validation, account provisioning, session identity, and password rotation.
 const bcrypt = require('bcryptjs');
-const { generateToken } = require('../utils/jwt');
+const { generateToken, isJwtConfigured } = require('../utils/jwt');
 const { successResponse, errorResponse } = require('../utils/response');
 const { supabase } = require('../config/supabase');
 
@@ -11,6 +12,9 @@ const login = async (req, res, next) => {
   const { email, password } = req.body;
 
   try {
+    if (!isJwtConfigured()) {
+      return errorResponse(res, 'Authentication is not configured on this server.', 503);
+    }
     console.log('[AUTH] Login attempt for:', email);
     const formattedEmail = email.toLowerCase().trim();
 
@@ -31,7 +35,8 @@ const login = async (req, res, next) => {
       return errorResponse(res, 'Invalid email or password.', 401);
     }
 
-    // Verify password (support both bcrypt hash and direct plaintext comparison for test users)
+    // Passwords are always stored and checked with bcrypt. Plaintext legacy
+    // records must be reset rather than being accepted by the API.
     let isMatch = false;
     const isBcryptHash = user.password_hash.startsWith('$2a$') || 
                          user.password_hash.startsWith('$2b$') || 
@@ -43,11 +48,7 @@ const login = async (req, res, next) => {
         isMatch = await bcrypt.compare(password, user.password_hash);
       } catch (err) {
         console.error('[AUTH] Bcrypt comparison error:', err.message);
-        isMatch = (password === user.password_hash);
       }
-    } else {
-      console.log('[AUTH] Plaintext password comparison for user:', formattedEmail);
-      isMatch = (password === user.password_hash);
     }
 
     if (!isMatch) {
@@ -83,7 +84,7 @@ const login = async (req, res, next) => {
     });
   } catch (error) {
     console.error('[AUTH] Login exception:', error.message, error.stack);
-    return errorResponse(res, `Login failed: ${error.message}`, 500);
+    return errorResponse(res, 'Unable to complete login at this time.', 500);
   }
 };
 
@@ -92,11 +93,14 @@ const login = async (req, res, next) => {
  * Register a new user account
  */
 const register = async (req, res, next) => {
-  const { fullName, email, password, role } = req.body;
+  const { fullName, email, password } = req.body;
 
   try {
+    if (!isJwtConfigured()) {
+      return errorResponse(res, 'Authentication is not configured on this server.', 503);
+    }
     console.log('[AUTH] Registration endpoint hit');
-    console.log('[AUTH] Request body:', { fullName, email, role, passwordLength: password?.length });
+    console.log('[AUTH] Request body:', { fullName, email, passwordLength: password?.length });
 
     if (!supabase) {
       console.error('[AUTH] Supabase not configured');
@@ -116,7 +120,7 @@ const register = async (req, res, next) => {
 
     if (lookupError) {
       console.error('[AUTH] User lookup error:', lookupError.message, lookupError.code);
-      return errorResponse(res, `Registration failed during user lookup: ${lookupError.message}`, 500);
+      return errorResponse(res, 'Unable to verify whether this email is available.', 500);
     }
 
     if (existingUser) {
@@ -126,9 +130,8 @@ const register = async (req, res, next) => {
 
     console.log('[AUTH] User does not exist, proceeding with registration');
 
-    // Validate role
-    const validRoles = ['Admin', 'Doctor', 'Patient', 'Receptionist', 'Pharmacist', 'Laboratory Staff'];
-    const userRole = role && validRoles.includes(role) ? role : 'Patient';
+    // Public registration never accepts a role from the client. Staff accounts are created by an Admin.
+    const userRole = 'Patient';
 
     // Hash password
     console.log('[AUTH] Hashing password...');
@@ -151,7 +154,7 @@ const register = async (req, res, next) => {
 
     if (insertError) {
       console.error('[AUTH] User insert error:', insertError.message, insertError.code, insertError.details);
-      return errorResponse(res, `Failed to create account: ${insertError.message}`, 500);
+      return errorResponse(res, 'Unable to create the account at this time.', 500);
     }
 
     console.log('[AUTH] User created successfully:', newUser.id, newUser.email);
@@ -200,7 +203,7 @@ const register = async (req, res, next) => {
     }, 201);
   } catch (error) {
     console.error('[AUTH] Registration exception:', error.message, error.stack);
-    return errorResponse(res, `Registration failed: ${error.message}`, 500);
+    return errorResponse(res, 'Unable to create the account at this time.', 500);
   }
 };
 
@@ -228,10 +231,11 @@ const getCurrentUser = async (req, res, next) => {
     return successResponse(res, 'Profile retrieved successfully', { user });
   } catch (error) {
     console.error('[AUTH] Get current user exception:', error.message);
-    return errorResponse(res, `Failed to retrieve profile: ${error.message}`, 500);
+    return errorResponse(res, 'Unable to retrieve the profile at this time.', 500);
   }
 };
 
+// Re-authenticates the caller with their current password before persisting a newly hashed replacement.
 const changePassword = async (req, res, next) => {
   try {
     if (!supabase) {
@@ -263,9 +267,10 @@ const changePassword = async (req, res, next) => {
     const isBcryptHash = user.password_hash.startsWith('$2a$') ||
                          user.password_hash.startsWith('$2b$') ||
                          user.password_hash.startsWith('$2y$');
-    const isMatch = isBcryptHash
-      ? await bcrypt.compare(currentPassword, user.password_hash)
-      : currentPassword === user.password_hash;
+    if (!isBcryptHash) {
+      return errorResponse(res, 'This account requires an administrator password reset.', 409);
+    }
+    const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
 
     if (!isMatch) {
       return errorResponse(res, 'Current password is incorrect.', 400);

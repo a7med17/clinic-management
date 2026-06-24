@@ -1,3 +1,4 @@
+// Shared patient-directory routes used by authorized clinical and front-desk workflows.
 const express = require('express');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
@@ -12,6 +13,7 @@ const {
 const router = express.Router();
 
 // All patient routes require authentication
+// Ownership/role checks are enforced by the route and controller appropriate to each action.
 router.use(authMiddleware);
 
 /**
@@ -19,14 +21,14 @@ router.use(authMiddleware);
  * @desc    List all patients (Patients see only own record)
  * @access  Admin, Doctor, Receptionist, Patient (own)
  */
-router.get('/', getAllPatients);
+router.get('/', roleMiddleware(['Admin', 'Doctor', 'Receptionist', 'Patient']), getAllPatients);
 
 /**
  * @route   GET /api/patients/:id
  * @desc    Get patient by ID
  * @access  Admin, Doctor, Receptionist, Patient (own)
  */
-router.get('/:id', getPatientById);
+router.get('/:id', roleMiddleware(['Admin', 'Doctor', 'Receptionist', 'Patient']), getPatientById);
 
 /**
  * @route   POST /api/patients
@@ -40,7 +42,7 @@ router.post('/', roleMiddleware(['Admin', 'Doctor', 'Receptionist']), createPati
  * @desc    Update a patient (Patient can update own)
  * @access  Admin, Doctor, Receptionist, Patient (own)
  */
-router.put('/:id', updatePatient);
+router.put('/:id', roleMiddleware(['Admin', 'Doctor', 'Receptionist', 'Patient']), updatePatient);
 
 /**
  * @route   DELETE /api/patients/:id

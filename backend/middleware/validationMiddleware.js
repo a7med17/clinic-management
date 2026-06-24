@@ -2,7 +2,7 @@ const { validationResult } = require('express-validator');
 const { errorResponse } = require('../utils/response');
 
 /**
- * Middleware to intercept and format validation errors
+ * Converts express-validator output into the standard API error envelope before controllers run.
  */
 const validationMiddleware = (req, res, next) => {
   const errors = validationResult(req);

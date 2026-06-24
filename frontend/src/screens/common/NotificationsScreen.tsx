@@ -1,3 +1,4 @@
+// Placeholder notifications hub; the phase-one notification screen currently uses static presentation data.
 import React from 'react';
 import { StyleSheet, View, Text, SafeAreaView } from 'react-native';
 

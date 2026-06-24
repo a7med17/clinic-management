@@ -127,7 +127,7 @@ CREATE TABLE invoices (
     invoice_number VARCHAR(100) UNIQUE NOT NULL,
     patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
     appointment_id UUID REFERENCES appointments(id) ON DELETE SET NULL,
-    total_amount NUMERIC(10,2) NOT NULL DEFAULT 0,
+    total_amount NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (total_amount >= 0),
     status VARCHAR(50) DEFAULT 'Unpaid' CHECK (
         status IN ('Unpaid', 'Paid', 'Partially Paid', 'Refunded')
     ),
@@ -144,9 +144,9 @@ CREATE TABLE invoice_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
     item_name VARCHAR(255) NOT NULL,
-    quantity INTEGER DEFAULT 1,
-    unit_price NUMERIC(10,2),
-    total_price NUMERIC(10,2)
+    quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    unit_price NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (unit_price >= 0),
+    total_price NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (total_price >= 0)
 );
 
 -- ==========================================
@@ -156,7 +156,7 @@ CREATE TABLE invoice_items (
 CREATE TABLE payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
-    amount NUMERIC(10,2) NOT NULL,
+    amount NUMERIC(10,2) NOT NULL CHECK (amount > 0),
     payment_method VARCHAR(50) CHECK (
         payment_method IN ('Cash', 'Card', 'Insurance', 'Bank Transfer')
     ),
@@ -186,7 +186,9 @@ CREATE TABLE lab_tests (
     patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
     doctor_id UUID REFERENCES doctors(id) ON DELETE SET NULL,
     test_name VARCHAR(255) NOT NULL,
-    status VARCHAR(50) DEFAULT 'Pending',
+    status VARCHAR(50) NOT NULL DEFAULT 'Pending' CHECK (
+        status IN ('Pending', 'Processing', 'Completed', 'Cancelled')
+    ),
     result TEXT,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
@@ -214,6 +216,12 @@ CREATE INDEX idx_appointments_patient_id ON appointments(patient_id);
 CREATE INDEX idx_appointments_doctor_id ON appointments(doctor_id);
 CREATE INDEX idx_invoices_patient_id ON invoices(patient_id);
 CREATE INDEX idx_payments_invoice_id ON payments(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_doctor_schedules_doctor_day ON doctor_schedules(doctor_id, day_of_week);
+CREATE INDEX IF NOT EXISTS idx_appointments_status_date ON appointments(status, appointment_date);
+CREATE INDEX IF NOT EXISTS idx_lab_tests_patient_created_at ON lab_tests(patient_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_lab_tests_doctor_created_at ON lab_tests(doctor_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_created_at ON audit_logs(user_id, created_at DESC);
 
 -- ==========================================
 -- ADDITIONAL CONSTRAINTS
