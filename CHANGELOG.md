@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-06-25 — Sprint 2.3 patient profile & details
+
+- Objective: Replace the generic module detail path for selected patients with a dedicated patient profile screen.
+- Reason: Reuse the existing patient API and registration form while keeping the scope limited to patient profile/details.
+- Files modified: Frontend patient-directory navigation, app navigator, and changelog.
+- Files added: New patient details screen.
+- Database changes: None.
+- Backend changes: None.
+- Validation/security improvements: Patient details now load from the existing `/api/patients/:id` API and edit through the existing patient registration/update flow.
+- Testing performed: Pending after implementation.
+
 ## 2026-06-25 — Sprint 2.2 patient directory/list
 
 - Objective: Replace the patient directory/list placeholder with an API-backed directory for Admin and Receptionist roles.

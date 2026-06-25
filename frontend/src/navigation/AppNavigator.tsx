@@ -36,6 +36,7 @@ import {
   RoleDashboardScreen,
   RoleListScreen,
 } from '../screens/phase1/RoleScreens';
+import PatientDetailsScreen from '../screens/patients/PatientDetailsScreen';
 import { Role } from '../ui/clinicData';
 import { useAuth } from '../context/AuthContext';
 import { warnRoleTabInvariantViolations } from '../shell/shellNavigation';
@@ -192,6 +193,7 @@ export default function AppNavigator() {
             <Stack.Screen name="ReceptionWaitingRoom" component={ReceptionWaitingRoomScreen} />
             <Stack.Screen name="ReceptionInvoiceForm" component={ReceptionInvoiceFormScreen} />
             <Stack.Screen name="ReceptionInvoicePayment" component={ReceptionInvoicePaymentScreen} />
+            <Stack.Screen name="PatientDetails" component={PatientDetailsScreen} />
             <Stack.Screen name="ModuleDetail" component={ModuleDetailScreen} />
           </>
         )}

@@ -174,7 +174,7 @@ function PatientDirectoryScreen({ navigation, title, subtitle, role }: { navigat
             status={item.blood_type || undefined}
             icon="person-outline"
             tone={colors.teal}
-            onPress={() => navigation.navigate('ModuleDetail', { title: item.name, role })}
+            onPress={() => navigation.getParent()?.navigate('PatientDetails', { patientId: item.id, patient: item, role })}
           />
         ))}
       </Content>
