@@ -1,15 +1,18 @@
 // Authentication adapter: secure token storage, cacheable user context, and account self-service calls.
 import api from './api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
-
-// The token belongs in encrypted device storage; the non-sensitive user snapshot supports offline rendering.
-const TOKEN_KEY = 'auth_token';
+import {
+  clearSession,
+  getAccessToken,
+  getSession,
+  saveSession,
+  updateSessionUser,
+  UserRole,
+} from './sessionStorage';
 
 export interface User {
   id: string;
   name: string;
-  role: 'Admin' | 'Doctor' | 'Patient' | 'Receptionist' | 'Pharmacist' | 'Laboratory Staff';
+  role: UserRole;
   email: string;
   is_active?: boolean;
 }
@@ -37,9 +40,11 @@ export const login = async (email: string, password: string): Promise<LoginRespo
 
     if (responseData.success && responseData.data?.token) {
       const { token, user } = responseData.data;
-      await SecureStore.setItemAsync(TOKEN_KEY, token);
-      await AsyncStorage.setItem('user_info', JSON.stringify(user));
-      return { success: true, token, user };
+      const session = await saveSession({ accessToken: token, user });
+      if (!session) {
+        return { success: false, message: 'Unable to store secure session.' };
+      }
+      return { success: true, token: session.accessToken, user: session.user };
     }
     
     return { success: false, message: responseData.message || 'Verification failed.' };
@@ -55,8 +60,7 @@ export const login = async (email: string, password: string): Promise<LoginRespo
  */
 export const logout = async (): Promise<void> => {
   try {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
-    await AsyncStorage.removeItem('user_info');
+    await clearSession();
   } catch (error) {
     console.error('[Auth Service] Error clearing session storage:', error);
   }
@@ -67,8 +71,8 @@ export const logout = async (): Promise<void> => {
  */
 export const getCurrentUser = async (): Promise<User | null> => {
   try {
-    const userStr = await AsyncStorage.getItem('user_info');
-    return userStr ? JSON.parse(userStr) : null;
+    const session = await getSession();
+    return session?.user ?? null;
   } catch (error) {
     return null;
   }
@@ -80,17 +84,41 @@ export const getCurrentUserProfile = async (): Promise<User | null> => {
     const response = await api.get('/auth/me');
     const user = response.data.data?.user;
     if (user) {
-      await AsyncStorage.setItem('user_info', JSON.stringify(user));
+      const session = await updateSessionUser(user);
+      return session?.user ?? null;
     }
-    return user || null;
+    return null;
   } catch (error: any) {
     console.error('[Auth Service] Profile fetch error:', error.response?.data || error.message);
     // A rejected token ends the session; other failures retain cached identity for graceful offline use.
     if (error.response?.status === 401) {
-      await logout();
       return null;
     }
     return getCurrentUser();
+  }
+};
+
+export const validateCurrentSession = async (): Promise<User | null> => {
+  const session = await getSession();
+  if (!session) return null;
+
+  try {
+    const response = await api.get('/auth/me');
+    const user = response.data.data?.user;
+    if (!user) {
+      await clearSession();
+      return null;
+    }
+
+    const updatedSession = await updateSessionUser(user);
+    return updatedSession?.user ?? session.user;
+  } catch (error: any) {
+    if (error.response?.status === 401) {
+      return null;
+    }
+
+    console.warn('[Auth Service] Session validation skipped:', error.response?.data || error.message);
+    return session.user;
   }
 };
 
@@ -124,7 +152,7 @@ export const changePassword = async (payload: {
  */
 export const getToken = async (): Promise<string | null> => {
   try {
-    return await SecureStore.getItemAsync(TOKEN_KEY);
+    return await getAccessToken();
   } catch {
     return null;
   }

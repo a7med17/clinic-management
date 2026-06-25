@@ -1,6 +1,6 @@
 // Navigation composition: public authentication screens, role-specific tabs, and shared detail screens.
 import React from 'react';
-import { Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -37,6 +37,7 @@ import {
   RoleListScreen,
 } from '../screens/phase1/RoleScreens';
 import { Role } from '../ui/clinicData';
+import { useAuth } from '../context/AuthContext';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -123,7 +124,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
 // Resolve the authenticated role once, then render its compact tab set with the same user context.
 function MainTabNavigator({ route }: any) {
-  const user = route.params?.user;
+  const { user: sessionUser } = useAuth();
+  const user = route.params?.user || sessionUser;
   const role: Role = user?.role || 'Patient';
   const tabs = ROLE_TABS[role] || ROLE_TABS.Patient;
 
@@ -142,41 +144,71 @@ function MainTabNavigator({ route }: any) {
   );
 }
 
-// Stack screens hold flows that drill beyond a tab; initialUser decides whether boot lands on Login or MainTabs.
-export default function AppNavigator({ initialUser = null }: { initialUser?: any }) {
+function SessionRestoreScreen() {
+  return (
+    <View style={styles.restoreScreen}>
+      <ActivityIndicator color="#004b46" size="large" />
+      <Text style={styles.restoreText}>Restoring secure session...</Text>
+    </View>
+  );
+}
+
+// Stack screens hold flows that drill beyond a tab; AuthContext decides whether boot lands on Login or MainTabs.
+export default function AppNavigator() {
+  const { isAuthenticated, isRestoring, user } = useAuth();
+  const initialRouteName = isRestoring ? 'SessionRestore' : isAuthenticated ? 'MainTabs' : 'Login';
+
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName={initialUser ? 'MainTabs' : 'Login'} screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen name="MainTabs" component={MainTabNavigator} initialParams={{ user: initialUser }} />
-        <Stack.Screen name="Notifications" component={NotificationsScreen} />
-        <Stack.Screen name="AdminUsers" component={AdminUsersScreen} />
-        <Stack.Screen name="ActiveStaff" component={ActiveStaffScreen} />
-        <Stack.Screen name="ProfileInformation" component={ProfileInformationScreen} />
-        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
-        <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
-        <Stack.Screen name="AppSettings" component={AppSettingsScreen} />
-        <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
-        <Stack.Screen name="DoctorAppointmentDetail" component={DoctorAppointmentDetailScreen} />
-        <Stack.Screen name="DoctorPatientDetail" component={DoctorPatientDetailScreen} />
-        <Stack.Screen name="DoctorLabTests" component={DoctorLabTestsScreen} />
-        <Stack.Screen name="PatientAppointmentDetail" component={PatientAppointmentDetailScreen} />
-        <Stack.Screen name="PatientBookAppointment" component={PatientBookAppointmentScreen} />
-        <Stack.Screen name="PatientLabResults" component={PatientLabResultsScreen} />
-        <Stack.Screen name="ReceptionPatientForm" component={ReceptionPatientFormScreen} />
-        <Stack.Screen name="ReceptionAppointmentForm" component={ReceptionAppointmentFormScreen} />
-        <Stack.Screen name="ReceptionAppointmentDetail" component={ReceptionAppointmentDetailScreen} />
-        <Stack.Screen name="ReceptionWaitingRoom" component={ReceptionWaitingRoomScreen} />
-        <Stack.Screen name="ReceptionInvoiceForm" component={ReceptionInvoiceFormScreen} />
-        <Stack.Screen name="ReceptionInvoicePayment" component={ReceptionInvoicePaymentScreen} />
-        <Stack.Screen name="ModuleDetail" component={ModuleDetailScreen} />
+      <Stack.Navigator key={initialRouteName} initialRouteName={initialRouteName} screenOptions={{ headerShown: false }}>
+        {isRestoring ? (
+          <Stack.Screen name="SessionRestore" component={SessionRestoreScreen} />
+        ) : (
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="MainTabs" component={MainTabNavigator} initialParams={{ user }} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            <Stack.Screen name="AdminUsers" component={AdminUsersScreen} />
+            <Stack.Screen name="ActiveStaff" component={ActiveStaffScreen} />
+            <Stack.Screen name="ProfileInformation" component={ProfileInformationScreen} />
+            <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+            <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+            <Stack.Screen name="AppSettings" component={AppSettingsScreen} />
+            <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
+            <Stack.Screen name="DoctorAppointmentDetail" component={DoctorAppointmentDetailScreen} />
+            <Stack.Screen name="DoctorPatientDetail" component={DoctorPatientDetailScreen} />
+            <Stack.Screen name="DoctorLabTests" component={DoctorLabTestsScreen} />
+            <Stack.Screen name="PatientAppointmentDetail" component={PatientAppointmentDetailScreen} />
+            <Stack.Screen name="PatientBookAppointment" component={PatientBookAppointmentScreen} />
+            <Stack.Screen name="PatientLabResults" component={PatientLabResultsScreen} />
+            <Stack.Screen name="ReceptionPatientForm" component={ReceptionPatientFormScreen} />
+            <Stack.Screen name="ReceptionAppointmentForm" component={ReceptionAppointmentFormScreen} />
+            <Stack.Screen name="ReceptionAppointmentDetail" component={ReceptionAppointmentDetailScreen} />
+            <Stack.Screen name="ReceptionWaitingRoom" component={ReceptionWaitingRoomScreen} />
+            <Stack.Screen name="ReceptionInvoiceForm" component={ReceptionInvoiceFormScreen} />
+            <Stack.Screen name="ReceptionInvoicePayment" component={ReceptionInvoicePaymentScreen} />
+            <Stack.Screen name="ModuleDetail" component={ModuleDetailScreen} />
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  restoreScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f3f7f6',
+  },
+  restoreText: {
+    color: '#004b46',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 12,
+  },
   tabShell: {
     position: 'absolute',
     left: 0,

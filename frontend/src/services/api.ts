@@ -1,7 +1,7 @@
 // Shared HTTP client. It discovers the Expo development host and injects the secure session token.
 import axios from 'axios';
 import Constants from 'expo-constants';
-import * as SecureStore from 'expo-secure-store';
+import { clearSession, getAccessToken } from './sessionStorage';
 
 // Expo Go runs on a device, so localhost must be replaced with the active Metro host in development.
 const getExpoHostApiUrl = () => {
@@ -36,12 +36,12 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config) => {
     try {
-      const token = await SecureStore.getItemAsync('auth_token');
+      const token = await getAccessToken();
       if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (error) {
-      console.warn('[API Service] Error reading secure authentication token:', error);
+      console.warn('[API Service] Error reading secure session token:', error);
     }
     return config;
   },
@@ -53,7 +53,11 @@ api.interceptors.request.use(
 // Preserve Axios errors for feature services while logging network-only failures with request context.
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    if (error.response?.status === 401) {
+      await clearSession();
+    }
+
     if (!error.response) {
       console.error('[API Service] Network request failed:', {
         baseURL: error.config?.baseURL,

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-25 — Sprint 0 Step 4A secure auth session
+
+- Objective: Centralize frontend session persistence and move safe auth identity fields into Expo SecureStore.
+- Reason: Remove direct SecureStore calls from feature/auth services, stop using AsyncStorage for the user session snapshot, and reset the app on invalid sessions.
+- Files modified: Frontend app bootstrap, navigation auth bootstrap, login screen handoff, auth service, API service, and new session/AuthContext utilities.
+- Database changes: None.
+- Backend changes: None.
+- Validation/security improvements: Bearer tokens are attached from the central session service, `401 Unauthorized` clears the secure session, and logout removes current plus legacy auth keys.
+- Testing performed: `npx tsc --noEmit`, direct backend JavaScript syntax check with `node --check`, and `git diff --check`; package-script checks are blocked on latest `main` because the expected `typecheck`, `check`, `test`, and `syntax` scripts are not defined there.
+
 ## 2026-06-23 — API contract, security, and booking hardening
 
 - Objective: Align frontend API consumers with existing routes and harden active appointment, billing, laboratory, and authentication workflows.
