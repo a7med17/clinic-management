@@ -481,6 +481,159 @@ const getPatientConsultations = async (req, res, next) => {
   }
 };
 
+const getPrescription = async (req, res, next) => {
+  try {
+    const doctor = await requireDoctor(req, res);
+    if (!doctor) return;
+
+    const { data: appointment, error: apptError } = await supabase
+      .from('appointments')
+      .select('id, patient_id')
+      .eq('id', req.params.id)
+      .eq('doctor_id', doctor.id)
+      .single();
+    if (apptError || !appointment) return errorResponse(res, 'Appointment not found.', 404);
+
+    const { data: prescription, error } = await supabase
+      .from('prescriptions')
+      .select('*, prescription_items:prescription_items(*)')
+      .eq('appointment_id', req.params.id)
+      .maybeSingle();
+    if (error) return errorResponse(res, 'Failed to retrieve prescription.', 500, error.message);
+    if (!prescription) return errorResponse(res, 'No prescription found for this appointment.', 404);
+
+    return successResponse(res, 'Prescription retrieved successfully', prescription);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const savePrescription = async (req, res, next) => {
+  try {
+    const doctor = await requireDoctor(req, res);
+    if (!doctor) return;
+
+    const { data: appointment, error: apptError } = await supabase
+      .from('appointments')
+      .select('id, patient_id')
+      .eq('id', req.params.id)
+      .eq('doctor_id', doctor.id)
+      .single();
+    if (apptError || !appointment) return errorResponse(res, 'Appointment not found.', 404);
+
+    const { notes, items } = req.body;
+    if (!Array.isArray(items) || items.length === 0) {
+      return errorResponse(res, 'At least one prescription item is required.', 400);
+    }
+    for (const item of items) {
+      if (!item.medicine_name || !item.dosage || !item.frequency || !item.duration) {
+        return errorResponse(res, 'Each item requires medicine_name, dosage, frequency, and duration.', 400);
+      }
+    }
+
+    const { data: existing } = await supabase
+      .from('prescriptions')
+      .select('id, status')
+      .eq('appointment_id', req.params.id)
+      .maybeSingle();
+    if (existing?.status === 'Finalized') return errorResponse(res, 'Finalized prescriptions cannot be edited.', 400);
+
+    let prescriptionId = existing?.id;
+
+    if (prescriptionId) {
+      await supabase.from('prescriptions').update({ notes, updated_at: new Date().toISOString() }).eq('id', prescriptionId);
+      await supabase.from('prescription_items').delete().eq('prescription_id', prescriptionId);
+    } else {
+      const { data: created, error: createError } = await supabase
+        .from('prescriptions')
+        .insert({ appointment_id: req.params.id, patient_id: appointment.patient_id, doctor_id: doctor.id, notes, status: 'Draft' })
+        .select('id')
+        .single();
+      if (createError || !created) return errorResponse(res, 'Failed to create prescription.', 500, createError?.message);
+      prescriptionId = created.id;
+    }
+
+    const rows = items.map((item) => ({
+      prescription_id: prescriptionId,
+      medicine_id: item.medicine_id || null,
+      medicine_name: item.medicine_name,
+      dosage: item.dosage,
+      frequency: item.frequency,
+      duration: item.duration,
+      instructions: item.instructions || ''
+    }));
+    const { error: insertError } = await supabase.from('prescription_items').insert(rows);
+    if (insertError) return errorResponse(res, 'Failed to save prescription items.', 500, insertError.message);
+
+    const { data: result, error: fetchError } = await supabase
+      .from('prescriptions')
+      .select('*, prescription_items:prescription_items(*)')
+      .eq('id', prescriptionId)
+      .single();
+    if (fetchError) return errorResponse(res, 'Prescription saved but failed to reload.', 500, fetchError.message);
+
+    return successResponse(res, 'Prescription saved successfully', result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const finalizePrescription = async (req, res, next) => {
+  try {
+    const doctor = await requireDoctor(req, res);
+    if (!doctor) return;
+
+    const { data: prescription, error } = await supabase
+      .from('prescriptions')
+      .select('*, prescription_items:prescription_items(*)')
+      .eq('id', req.params.id)
+      .single();
+    if (error || !prescription) return errorResponse(res, 'Prescription not found.', 404);
+    if (prescription.doctor_id !== doctor.id) return errorResponse(res, 'Prescription not found.', 404);
+    if (prescription.status === 'Finalized') return errorResponse(res, 'Prescription is already finalized.', 400);
+    if (!prescription.prescription_items?.length) return errorResponse(res, 'Cannot finalize a prescription with no items.', 400);
+
+    const { data: updated, error: updateError } = await supabase
+      .from('prescriptions')
+      .update({ status: 'Finalized', updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .select('*, prescription_items:prescription_items(*)')
+      .single();
+    if (updateError) return errorResponse(res, 'Failed to finalize prescription.', 500, updateError.message);
+
+    return successResponse(res, 'Prescription finalized successfully', updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getPatientPrescriptions = async (req, res, next) => {
+  try {
+    const doctor = await requireDoctor(req, res);
+    if (!doctor) return;
+
+    const { data: hasAccess } = await supabase
+      .from('appointments')
+      .select('id')
+      .eq('doctor_id', doctor.id)
+      .eq('patient_id', req.params.patientId)
+      .limit(1)
+      .maybeSingle();
+    if (!hasAccess) return errorResponse(res, 'Patient not assigned to this doctor.', 403);
+
+    const { data, error } = await supabase
+      .from('prescriptions')
+      .select('*, prescription_items:prescription_items(*)')
+      .eq('patient_id', req.params.patientId)
+      .order('created_at', { ascending: false });
+    if (error) return errorResponse(res, 'Failed to retrieve patient prescriptions.', 500, error.message);
+
+    return successResponse(res, 'Patient prescriptions retrieved successfully', data || []);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getDashboard,
   getAppointments,
@@ -495,5 +648,9 @@ module.exports = {
   getPatientConsultations,
   getLabTests,
   createLabTest,
-  getProfile
+  getProfile,
+  getPrescription,
+  savePrescription,
+  finalizePrescription,
+  getPatientPrescriptions
 };

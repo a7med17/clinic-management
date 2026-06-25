@@ -128,3 +128,44 @@ export const createDoctorLabTest = async (payload: { patient_id: string; test_na
   unwrap(await api.post('/doctor/lab-tests', payload));
 
 export const getDoctorProfile = async (): Promise<any> => unwrap(await api.get('/doctor/profile'));
+
+// ─── Prescription types & API ────────────────────────────────────────────────
+
+export interface PrescriptionItem {
+  id?: string;
+  medicine_id?: string | null;
+  medicine_name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions?: string;
+}
+
+export interface Prescription {
+  id: string;
+  appointment_id: string;
+  patient_id: string;
+  doctor_id: string;
+  status: 'Draft' | 'Finalized';
+  notes?: string;
+  prescription_items?: PrescriptionItem[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PrescriptionSavePayload {
+  notes?: string;
+  items: PrescriptionItem[];
+}
+
+export const getDoctorAppointmentPrescription = async (appointmentId: string): Promise<Prescription> =>
+  unwrap(await api.get(`/doctor/appointments/${appointmentId}/prescription`));
+
+export const saveDoctorPrescription = async (appointmentId: string, payload: PrescriptionSavePayload): Promise<Prescription> =>
+  unwrap(await api.put(`/doctor/appointments/${appointmentId}/prescription`, payload));
+
+export const finalizeDoctorPrescription = async (prescriptionId: string): Promise<Prescription> =>
+  unwrap(await api.post(`/doctor/prescriptions/${prescriptionId}/finalize`));
+
+export const getDoctorPatientPrescriptions = async (patientId: string): Promise<Prescription[]> =>
+  unwrap(await api.get(`/doctor/patients/${patientId}/prescriptions`));

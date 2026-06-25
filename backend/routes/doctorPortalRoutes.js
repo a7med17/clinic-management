@@ -7,6 +7,7 @@ const validationMiddleware = require('../middleware/validationMiddleware');
 const {
   completeConsultation,
   createLabTest,
+  finalizePrescription,
   getAppointment,
   getAppointments,
   getConsultation,
@@ -14,9 +15,12 @@ const {
   getLabTests,
   getPatient,
   getPatientConsultations,
+  getPatientPrescriptions,
   getPatients,
+  getPrescription,
   getProfile,
   saveConsultation,
+  savePrescription,
   updateAppointmentNotes,
   updateAppointmentStatus
 } = require('../controllers/doctorPortalController');
@@ -93,5 +97,11 @@ router.get('/patients/:id', getPatient);
 router.get('/lab-tests', getLabTests);
 router.post('/lab-tests', createLabTest);
 router.get('/profile', getProfile);
+
+// Prescription management routes — attached to the doctor portal's authorization gate.
+router.get('/appointments/:id/prescription', getPrescription);
+router.put('/appointments/:id/prescription', savePrescription);
+router.post('/prescriptions/:id/finalize', finalizePrescription);
+router.get('/patients/:patientId/prescriptions', getPatientPrescriptions);
 
 module.exports = router;

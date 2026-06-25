@@ -35,6 +35,7 @@ const ROOT_STACK_ROUTES = [
   'ConsultationHistory',
   'DoctorPatientDetail',
   'DoctorLabTests',
+  'DoctorPrescription',
   'PatientBookAppointment',
   'PatientLabResults',
   'ReceptionPatientForm',

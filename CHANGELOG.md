@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-06-26 — Sprint 4.4 prescription management
+
+- Objective: Implement a complete Doctor Prescription Management module attached to existing consultations.
+- Reason: Allow doctors to create, save as draft, and finalize prescriptions with medicine search from the existing pharmacy inventory.
+- Files modified: Backend schema, doctor portal controller/routes, doctor service, appointment details screen, consultation history screen, app navigator, shell navigation, and changelog.
+- Files added: PrescriptionScreen.
+- Database changes: Added prescriptions and prescription_items tables to reference schema.
+- Backend changes: Added `GET/PUT /api/doctor/appointments/:id/prescription`, `POST /api/doctor/prescriptions/:id/finalize`, and `GET /api/doctor/patients/:patientId/prescriptions` under the existing doctor portal. PUT replaces all items (idempotent). Finalized prescriptions are read-only.
+- Validation/security improvements: All endpoints are scoped to the authenticated doctor's patient assignments; finalized prescriptions reject edits; save requires at least one item with medicine_name, dosage, frequency, and duration.
+- Testing performed: `npx tsc --noEmit`, `node --check` on backend, `git diff --check`.
+
 ## 2026-06-26 — Sprint 4.3 consultation history & clinical record
 
 - Objective: Implement a complete Consultation History & Clinical Record module extending the existing Doctor Consultation workflow.

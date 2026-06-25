@@ -11,6 +11,7 @@ import RegisterScreen from '../screens/auth/RegisterScreen';
 import AppointmentDetailsScreen from '../screens/appointments/AppointmentDetailsScreen';
 import ConsultationHistoryScreen from '../screens/doctor/ConsultationHistoryScreen';
 import DoctorConsultationScreen from '../screens/doctor/DoctorConsultationScreen';
+import PrescriptionScreen from '../screens/doctor/PrescriptionScreen';
 import {
   ManagementScreen,
   ModuleDetailScreen,
@@ -194,6 +195,7 @@ export default function AppNavigator() {
             <Stack.Screen name="ReceptionInvoiceForm" component={ReceptionInvoiceFormScreen} />
             <Stack.Screen name="ReceptionInvoicePayment" component={ReceptionInvoicePaymentScreen} />
             <Stack.Screen name="PatientDetails" component={PatientDetailsScreen} />
+            <Stack.Screen name="DoctorPrescription" component={PrescriptionScreen} />
             <Stack.Screen name="ModuleDetail" component={ModuleDetailScreen} />
           </>
         )}

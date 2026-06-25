@@ -132,6 +132,11 @@ export default function AppointmentDetailsScreen({ navigation, route }: any) {
                 <Text style={styles.outlineButtonText}>Consultation History</Text>
               </TouchableOpacity>
             ) : null}
+            {role === 'Doctor' && item.patient_id ? (
+              <TouchableOpacity style={styles.outlineButton} onPress={() => navigation.navigate('DoctorPrescription', { appointmentId: item.id, patientId: item.patient_id, patientName: item.patients?.name })}>
+                <Text style={styles.outlineButtonText}>Prescribe</Text>
+              </TouchableOpacity>
+            ) : null}
             {role === 'Receptionist' ? (
               <>
                 <TouchableOpacity disabled={actionSaving || !['Pending', 'Confirmed'].includes(item.status || '')} style={styles.secondaryButton} onPress={handleCheckIn}>
