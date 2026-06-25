@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-06-25 — Sprint 1C dashboard real data hydration
+
+- Objective: Hydrate the shared application shell with live dashboard data from existing APIs.
+- Reason: Replace the most visible dashboard placeholders with safe real data without adding backend endpoints or building feature modules.
+- Files modified: Application shell screen and changelog.
+- Files added: Role-aware shell dashboard data hook.
+- Database changes: None.
+- Backend changes: None.
+- Validation/security improvements: The shell never calls Admin APIs for non-admin roles and falls back to existing shell defaults when live dashboard requests fail.
+- Testing performed: `npx tsc --noEmit`, `node --test` from backend with 0 discovered tests, direct backend JavaScript syntax check with `node --check`, and `git diff --check`.
+
 ## 2026-06-25 — Sprint 1B shell navigation safety
 
 - Objective: Harden shared shell navigation targets without changing tab behavior.
