@@ -13,6 +13,7 @@ const {
   getDashboard,
   getLabTests,
   getPatient,
+  getPatientConsultations,
   getPatients,
   getProfile,
   saveConsultation,
@@ -87,6 +88,7 @@ router.get('/appointments/:id', getAppointment);
 router.patch('/appointments/:id/status', updateAppointmentStatus);
 router.patch('/appointments/:id/notes', updateAppointmentNotes);
 router.get('/patients', getPatients);
+router.get('/patients/:patientId/consultations', getPatientConsultations);
 router.get('/patients/:id', getPatient);
 router.get('/lab-tests', getLabTests);
 router.post('/lab-tests', createLabTest);

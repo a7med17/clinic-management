@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import AppointmentDetailsScreen from '../screens/appointments/AppointmentDetailsScreen';
+import ConsultationHistoryScreen from '../screens/doctor/ConsultationHistoryScreen';
 import DoctorConsultationScreen from '../screens/doctor/DoctorConsultationScreen';
 import {
   ManagementScreen,
@@ -181,6 +182,7 @@ export default function AppNavigator() {
             <Stack.Screen name="AppSettings" component={AppSettingsScreen} />
             <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
             <Stack.Screen name="AppointmentDetails" component={AppointmentDetailsScreen} />
+            <Stack.Screen name="ConsultationHistory" component={ConsultationHistoryScreen} />
             <Stack.Screen name="DoctorConsultation" component={DoctorConsultationScreen} />
             <Stack.Screen name="DoctorPatientDetail" component={DoctorPatientDetailScreen} />
             <Stack.Screen name="DoctorLabTests" component={DoctorLabTestsScreen} />

@@ -32,6 +32,7 @@ const ROOT_STACK_ROUTES = [
   'AppSettings',
   'HelpSupport',
   'AppointmentDetails',
+  'ConsultationHistory',
   'DoctorPatientDetail',
   'DoctorLabTests',
   'PatientBookAppointment',

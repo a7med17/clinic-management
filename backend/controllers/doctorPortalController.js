@@ -440,6 +440,47 @@ const getProfile = async (req, res, next) => {
   }
 };
 
+const getPatientConsultations = async (req, res, next) => {
+  try {
+    const doctor = await requireDoctor(req, res);
+    if (!doctor) return;
+
+    const { data: appointments, error } = await supabase
+      .from('appointments')
+      .select(appointmentSelect)
+      .eq('doctor_id', doctor.id)
+      .eq('patient_id', req.params.patientId)
+      .neq('doctor_notes', null)
+      .neq('doctor_notes', '')
+      .order('appointment_date', { ascending: false });
+    if (error) return errorResponse(res, 'Failed to retrieve consultation history.', 500, error.message);
+
+    const consultations = (appointments || []).map((appointment) => {
+      const parsed = parseConsultationNotes(appointment.doctor_notes);
+      return {
+        id: appointment.id,
+        appointment_id: appointment.id,
+        patient_id: appointment.patient_id,
+        doctor_id: appointment.doctor_id,
+        appointment_date: appointment.appointment_date,
+        status: appointment.status === 'Completed' ? 'Completed' : 'Draft',
+        updated_at: appointment.updated_at,
+        chief_complaint: parsed.chief_complaint,
+        diagnosis_summary: parsed.diagnosis_summary,
+        symptoms: parsed.symptoms,
+        treatment_plan: parsed.treatment_plan,
+        doctor_notes: parsed.doctor_notes,
+        patient: appointment.patients,
+        doctor: appointment.doctors
+      };
+    });
+
+    return successResponse(res, 'Patient consultations retrieved successfully', consultations);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getDashboard,
   getAppointments,
@@ -451,6 +492,7 @@ module.exports = {
   updateAppointmentNotes,
   getPatients,
   getPatient,
+  getPatientConsultations,
   getLabTests,
   createLabTest,
   getProfile

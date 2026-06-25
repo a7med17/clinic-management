@@ -97,9 +97,29 @@ export const updateDoctorAppointmentStatus = async (id: string, status: Appointm
 export const updateDoctorAppointmentNotes = async (id: string, doctor_notes: string, complete = false): Promise<DoctorAppointment> =>
   unwrap(await api.patch(`/doctor/appointments/${id}/notes`, { doctor_notes, complete }));
 
+export interface DoctorPatientConsultation {
+  id: string;
+  appointment_id: string;
+  patient_id: string;
+  doctor_id: string;
+  appointment_date: string;
+  status: DoctorConsultationStatus;
+  updated_at?: string;
+  chief_complaint: string;
+  diagnosis_summary: string;
+  symptoms: string;
+  treatment_plan: string;
+  doctor_notes: string;
+  patient?: any;
+  doctor?: any;
+}
+
 export const getDoctorPatients = async (): Promise<any[]> => unwrap(await api.get('/doctor/patients'));
 
 export const getDoctorPatient = async (id: string): Promise<DoctorPatientDetail> => unwrap(await api.get(`/doctor/patients/${id}`));
+
+export const getDoctorPatientConsultations = async (patientId: string): Promise<DoctorPatientConsultation[]> =>
+  unwrap(await api.get(`/doctor/patients/${patientId}/consultations`));
 
 export const getDoctorLabTests = async (status?: string): Promise<DoctorLabTest[]> =>
   unwrap(await api.get('/doctor/lab-tests', { params: status ? { status } : undefined }));

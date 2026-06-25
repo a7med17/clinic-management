@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-06-26 — Sprint 4.3 consultation history & clinical record
+
+- Objective: Implement a complete Consultation History & Clinical Record module extending the existing Doctor Consultation workflow.
+- Reason: Allow doctors to view, edit, and update past consultations per patient without introducing new database tables.
+- Files modified: Doctor portal controller, doctor portal routes, doctor service, appointment details screen, doctor patient detail screen, app navigator, shell navigation, and changelog.
+- Files added: ConsultationHistoryScreen.
+- Database changes: None.
+- Backend changes: Added `GET /api/doctor/patients/:patientId/consultations` endpoint returning consultations ordered by newest first; each record exposes appointment date, chief complaint, diagnosis summary, status, and updated timestamp.
+- Validation/security improvements: Endpoint is scoped to the authenticated doctor's patient assignments; no delete endpoint; other roles have no access.
+- Testing performed: `npx tsc --noEmit`, `node --test` from backend with 0 discovered tests, direct backend JavaScript syntax check with `node --check`, and `git diff --check`.
+
 ## 2026-06-26 — Sprint 4.2 doctor consultation workflow
 
 - Objective: Allow doctors to start, save, and complete a consultation from an appointment.

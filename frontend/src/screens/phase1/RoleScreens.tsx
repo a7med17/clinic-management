@@ -2217,6 +2217,9 @@ export function DoctorPatientDetailScreen({ navigation, route }: any) {
             <ListRow title="Allergies" subtitle={patient.allergies || 'None recorded'} icon="alert-circle-outline" tone={colors.orange} />
             <ListRow title="Medical Conditions" subtitle={patient.medical_conditions || 'None recorded'} icon="medical-outline" tone={colors.red} />
             <ListRow title="Emergency Contact" subtitle={patient.emergency_contact || 'Not available'} icon="call-outline" tone={colors.green} />
+            <TouchableOpacity style={local.secondaryButton} onPress={() => navigation.getParent()?.navigate('ConsultationHistory', { patientId: id, patientName: patient?.name })}>
+              <Text style={local.secondaryButtonText}>Consultation History</Text>
+            </TouchableOpacity>
             <SectionHeader title="Appointment History" />
             {(detail.appointmentHistory || []).map((appointment: DoctorAppointment) => (
               <ListRow key={appointment.id} title={new Date(appointment.appointment_date).toLocaleString()} subtitle={appointment.status} meta={appointment.doctor_notes || appointment.notes || ''} icon="calendar-outline" tone={appointment.status === 'Completed' ? colors.green : colors.blue} />
