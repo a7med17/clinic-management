@@ -68,6 +68,7 @@ import {
 } from '../../services/receptionService';
 import { Medicine, getMedicines } from '../../services/pharmacyService';
 import { LabTestRecord, getLabTests, updateLabTest } from '../../services/labService';
+import ApplicationShellScreen from '../../shell/ApplicationShellScreen';
 import {
   ActionCard,
   ChartCard,
@@ -115,14 +116,9 @@ function grid(children: React.ReactNode) {
 // Dashboard dispatcher: each role receives only its dashboard and its API calls.
 export function RoleDashboardScreen({ navigation, route }: any) {
   const role = getRole(route);
-  const name = getName(route);
+  const user = route?.params?.user || { role, name: getName(route) };
 
-  if (role === 'Admin') return <AdminDashboard navigation={navigation} name={name} />;
-  if (role === 'Doctor') return <DoctorDashboard navigation={navigation} name={name} />;
-  if (role === 'Receptionist') return <ReceptionDashboard navigation={navigation} />;
-  if (role === 'Pharmacist') return <PharmacyDashboard navigation={navigation} />;
-  if (role === 'Laboratory Staff') return <LabDashboard navigation={navigation} />;
-  return <PatientDashboard navigation={navigation} name={name} />;
+  return <ApplicationShellScreen navigation={navigation} route={route} user={user} />;
 }
 
 // ── Role dashboards: fetch independently owned metrics and expose role-specific next actions. ──
