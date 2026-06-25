@@ -37,3 +37,6 @@ export const cancelAppointment = async (id: string): Promise<AppointmentRecord> 
 
 export const getAppointmentById = async (id: string): Promise<AppointmentRecord> =>
   unwrap(await api.get(`/appointments/${id}`));
+
+export const checkInPatient = async (id: string): Promise<AppointmentRecord> =>
+  unwrap(await api.patch(`/reception/appointments/${id}/check-in`));

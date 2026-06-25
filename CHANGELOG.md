@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-06-26 — Sprint 3.2 appointment management
+
+- Objective: Provide appointment management for Receptionists, Doctors, and Patients using the existing appointment infrastructure.
+- Reason: Replace placeholder appointment lists with API-backed lists and add search/filter, check-in, cancel, reschedule capabilities.
+- Files modified: Shared appointment service, phase1 role screens, and changelog.
+- Files added: None.
+- Database changes: None.
+- Backend changes: None.
+- Validation/security improvements: Reception appointment list now supports client-side text search by patient or doctor name; Doctor appointment detail now shows the patient's reason; shared appointment service exposes checkInPatient helper.
+- Testing performed: `npx tsc --noEmit`, `node --test` from backend with 0 discovered tests, direct backend JavaScript syntax check with `node --check`, and `git diff --check`.
+
 ## 2026-06-25 — Sprint 2.3 patient profile & details
 
 - Objective: Replace the generic module detail path for selected patients with a dedicated patient profile screen.

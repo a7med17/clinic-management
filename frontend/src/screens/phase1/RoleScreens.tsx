@@ -65,7 +65,7 @@ import {
 } from '../../services/receptionService';
 import { Medicine, getMedicines } from '../../services/pharmacyService';
 import { LabTestRecord, getLabTests, updateLabTest } from '../../services/labService';
-import { AppointmentPayload, createAppointment, updateAppointment } from '../../services/appointmentService';
+import { AppointmentPayload, checkInPatient, createAppointment, updateAppointment } from '../../services/appointmentService';
 import { PatientRegistrationPayload, PatientRecord, createPatientRecord, listPatients, updatePatientRecord } from '../../services/patientDirectoryService';
 import ApplicationShellScreen from '../../shell/ApplicationShellScreen';
 import {
@@ -930,6 +930,7 @@ export function ReceptionAppointmentsScreen({ navigation }: any) {
   const [items, setItems] = useState<ReceptionAppointment[]>([]);
   const [view, setView] = useState<'today' | 'upcoming'>('today');
   const [status, setStatus] = useState('All');
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -949,6 +950,16 @@ export function ReceptionAppointmentsScreen({ navigation }: any) {
   useEffect(() => {
     load();
   }, [view, status]);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return items;
+    const query = search.toLowerCase();
+    return items.filter(
+      (item) =>
+        (item.patients?.name || '').toLowerCase().includes(query) ||
+        (item.doctors?.name || '').toLowerCase().includes(query),
+    );
+  }, [items, search]);
 
   return (
     <Screen>
@@ -971,6 +982,16 @@ export function ReceptionAppointmentsScreen({ navigation }: any) {
             </TouchableOpacity>
           ))}
         </View>
+        <View style={local.formCard}>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by patient or doctor name"
+            placeholderTextColor="#8b97a8"
+            style={local.input}
+            autoCapitalize="none"
+          />
+        </View>
         {loading ? <ActivityIndicator color={colors.teal} /> : null}
         {error ? (
           <TouchableOpacity style={local.stateCard} onPress={load}>
@@ -978,8 +999,8 @@ export function ReceptionAppointmentsScreen({ navigation }: any) {
             <Text style={local.retryText}>Tap to retry</Text>
           </TouchableOpacity>
         ) : null}
-        {!loading && !error && items.length === 0 ? <Text style={local.stateText}>No appointments found.</Text> : null}
-        {items.map((item) => (
+        {!loading && !error && filtered.length === 0 ? <Text style={local.stateText}>No appointments found.</Text> : null}
+        {filtered.map((item) => (
           <ListRow
             key={item.id}
             title={item.patients?.name || 'Patient'}
@@ -2093,6 +2114,7 @@ export function DoctorAppointmentDetailScreen({ navigation, route }: any) {
         {item ? (
           <>
             <ListRow title={item.patients?.name || 'Patient'} subtitle={item.status} meta={new Date(item.appointment_date).toLocaleString()} icon="calendar-outline" tone={colors.blue} />
+            <ListRow title="Reason" subtitle={item.notes || 'No reason provided'} icon="document-text-outline" tone={colors.purple} />
             <View style={local.chipRow}>
               {appointmentStatuses.map((status) => (
                 <TouchableOpacity key={status} style={[local.chip, item.status === status && local.chipActive]} onPress={() => changeStatus(status)}>
