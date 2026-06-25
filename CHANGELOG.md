@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-06-25 — Sprint 1A.1 shared application shell
+
+- Objective: Add the first shared authenticated shell skeleton for all clinic roles.
+- Reason: Standardize the mobile home experience before building role-specific feature modules.
+- Files modified: Role dashboard entry point and changelog.
+- Files added: Shared application shell screen and role-based shell configuration.
+- Database changes: None.
+- Backend changes: None.
+- Validation/security improvements: None; existing authenticated navigation and SecureStore session handling remain unchanged.
+- Testing performed: `npx tsc --noEmit`, `node --test` from backend with 0 discovered tests, direct backend JavaScript syntax check with `node --check`, and `git diff --check`; package-script checks are blocked on current `origin/main` because the expected `typecheck`, `check`, `test`, and `syntax` scripts are not defined there.
+
 ## 2026-06-25 — Sprint 0 Step 4A secure auth session
 
 - Objective: Centralize frontend session persistence and move safe auth identity fields into Expo SecureStore.
