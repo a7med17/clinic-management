@@ -7,14 +7,19 @@ const {
   getLabTestById,
   createLabTest,
   updateLabTest,
-  deleteLabTest
+  deleteLabTest,
+  getLabDashboard,
+  getLabRequests,
+  getLabRequestById
 } = require('../controllers/labController');
 
 const router = express.Router();
+const labQueueRouter = express.Router();
 
 // All lab routes require authentication
 // Authentication is mandatory before clinical test data is exposed.
 router.use(authMiddleware);
+labQueueRouter.use(authMiddleware);
 
 /**
  * @route   GET /api/lab-tests
@@ -51,4 +56,30 @@ router.put('/:id', roleMiddleware(['Admin', 'Laboratory Staff']), updateLabTest)
  */
 router.delete('/:id', roleMiddleware(['Admin']), deleteLabTest);
 
+// ---------------------------------------------------------------------------
+// Lab Queue Endpoints  (/api/lab/*)
+// ---------------------------------------------------------------------------
+
+/**
+ * @route   GET /api/lab/dashboard
+ * @desc    Lab staff dashboard summary counts
+ * @access  Laboratory Staff
+ */
+labQueueRouter.get('/dashboard', roleMiddleware(['Laboratory Staff']), getLabDashboard);
+
+/**
+ * @route   GET /api/lab/requests
+ * @desc    List submitted lab requests ordered by priority then submitted time
+ * @access  Laboratory Staff
+ */
+labQueueRouter.get('/requests', roleMiddleware(['Laboratory Staff']), getLabRequests);
+
+/**
+ * @route   GET /api/lab/requests/:id
+ * @desc    Full read-only detail for a single lab request
+ * @access  Laboratory Staff
+ */
+labQueueRouter.get('/requests/:id', roleMiddleware(['Laboratory Staff']), getLabRequestById);
+
 module.exports = router;
+module.exports.labQueueRouter = labQueueRouter;

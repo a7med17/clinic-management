@@ -1,8 +1,17 @@
-// Laboratory test CRUD. Read queries are scoped to the requesting patient or doctor where applicable.
+// Laboratory test CRUD and lab request queue for Laboratory Staff.
 const { successResponse, errorResponse } = require('../utils/response');
 const { supabase } = require('../config/supabase');
 
 const LAB_STATUSES = ['Pending', 'Processing', 'Completed', 'Cancelled'];
+
+const PRIORITY_ORDER = { Stat: 3, Urgent: 2, Routine: 1 };
+
+const getHighestPriority = (tests) => {
+  if (!tests?.length) return 'Routine';
+  return tests.reduce((max, test) => {
+    return (PRIORITY_ORDER[test.priority] || 0) > (PRIORITY_ORDER[max] || 0) ? test.priority : max;
+  }, 'Routine');
+};
 
 const getLinkedRecordId = async (table, userId) => {
   const { data } = await supabase.from(table).select('id').eq('user_id', userId).maybeSingle();
@@ -255,10 +264,184 @@ const deleteLabTest = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/lab/dashboard
+ * Laboratory staff dashboard summary counts.
+ */
+const getLabDashboard = async (req, res, next) => {
+  try {
+    if (!supabase) {
+      return errorResponse(res, 'Database is not configured.', 503);
+    }
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    // Pending requests: submitted requests with at least one test in Pending status
+    const { data: pendingRequests, error: pendingError } = await supabase
+      .from('lab_requests')
+      .select('id, lab_request_tests:lab_request_tests!inner(status)')
+      .eq('status', 'Submitted')
+      .eq('lab_request_tests.status', 'Pending');
+
+    if (pendingError) {
+      console.error('[LAB QUEUE] Pending count error:', pendingError.message);
+      return errorResponse(res, 'Failed to retrieve pending count.', 500);
+    }
+
+    // Processing requests: submitted requests with at least one test in Processing status
+    const { data: processingRequests, error: processingError } = await supabase
+      .from('lab_requests')
+      .select('id, lab_request_tests:lab_request_tests!inner(status)')
+      .eq('status', 'Submitted')
+      .eq('lab_request_tests.status', 'Processing');
+
+    if (processingError) {
+      console.error('[LAB QUEUE] Processing count error:', processingError.message);
+      return errorResponse(res, 'Failed to retrieve processing count.', 500);
+    }
+
+    // Completed today: submitted requests with at least one test completed today
+    const { data: completedRequests, error: completedError } = await supabase
+      .from('lab_requests')
+      .select('id, lab_request_tests:lab_request_tests!inner(status, created_at)')
+      .eq('status', 'Submitted')
+      .eq('lab_request_tests.status', 'Completed')
+      .gte('lab_request_tests.created_at', todayStart.toISOString())
+      .lte('lab_request_tests.created_at', todayEnd.toISOString());
+
+    if (completedError) {
+      console.error('[LAB QUEUE] Completed today count error:', completedError.message);
+      return errorResponse(res, 'Failed to retrieve completed today count.', 500);
+    }
+
+    // Urgent requests: submitted requests with at least one test with Urgent or Stat priority
+    const { data: urgentRequests, error: urgentError } = await supabase
+      .from('lab_requests')
+      .select('id, lab_request_tests:lab_request_tests!inner(priority)')
+      .eq('status', 'Submitted')
+      .in('lab_request_tests.priority', ['Urgent', 'Stat']);
+
+    if (urgentError) {
+      console.error('[LAB QUEUE] Urgent count error:', urgentError.message);
+      return errorResponse(res, 'Failed to retrieve urgent count.', 500);
+    }
+
+    const dashboard = {
+      pendingRequests: pendingRequests?.length || 0,
+      processingRequests: processingRequests?.length || 0,
+      completedToday: completedRequests?.length || 0,
+      urgentRequests: urgentRequests?.length || 0,
+    };
+
+    return successResponse(res, 'Dashboard retrieved successfully', dashboard);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/lab/requests
+ * List all submitted lab requests ordered by priority then submitted time.
+ */
+const getLabRequests = async (req, res, next) => {
+  try {
+    if (!supabase) {
+      return errorResponse(res, 'Database is not configured.', 503);
+    }
+
+    const { data: requests, error } = await supabase
+      .from('lab_requests')
+      .select(`
+        id,
+        status,
+        notes,
+        created_at,
+        updated_at,
+        appointment_id,
+        patient_id,
+        doctor_id,
+        appointments:appointment_id ( id, appointment_date, status ),
+        patients:patient_id ( id, name ),
+        doctors:doctor_id ( id, name ),
+        lab_request_tests:lab_request_tests ( id, test_name, priority, status, clinical_notes, created_at )
+      `)
+      .eq('status', 'Submitted')
+      .order('updated_at', { ascending: true });
+
+    if (error) {
+      console.error('[LAB QUEUE] List requests error:', error.message);
+      return errorResponse(res, 'Failed to retrieve lab requests.', 500);
+    }
+
+    // Sort by highest priority among tests (Stat > Urgent > Routine), then by updated_at (submitted time)
+    const sortedRequests = (requests || []).map((req) => {
+      const maxPriority = getHighestPriority(req.lab_request_tests);
+      return { ...req, highest_priority: maxPriority };
+    }).sort((a, b) => {
+      const priorityDiff = (PRIORITY_ORDER[b.highest_priority] || 0) - (PRIORITY_ORDER[a.highest_priority] || 0);
+      if (priorityDiff !== 0) return priorityDiff;
+      return new Date(a.updated_at) - new Date(b.updated_at);
+    });
+
+    return successResponse(res, 'Lab requests retrieved successfully', sortedRequests);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/lab/requests/:id
+ * Full read-only detail for a single lab request.
+ */
+const getLabRequestById = async (req, res, next) => {
+  try {
+    if (!supabase) {
+      return errorResponse(res, 'Database is not configured.', 503);
+    }
+
+    const { data: labRequest, error } = await supabase
+      .from('lab_requests')
+      .select(`
+        id,
+        status,
+        notes,
+        created_at,
+        updated_at,
+        appointment_id,
+        patient_id,
+        doctor_id,
+        appointments:appointment_id ( id, appointment_date, status, notes ),
+        patients:patient_id ( id, name, email, phone, date_of_birth, gender, blood_type ),
+        doctors:doctor_id ( id, name, specialization, phone, email ),
+        lab_request_tests:lab_request_tests ( id, test_name, priority, status, clinical_notes, created_at )
+      `)
+      .eq('id', req.params.id)
+      .single();
+
+    if (error || !labRequest) {
+      return errorResponse(res, 'Lab request not found.', 404);
+    }
+
+    if (labRequest.status !== 'Submitted') {
+      return errorResponse(res, 'Lab request not found.', 404);
+    }
+
+    return successResponse(res, 'Lab request retrieved successfully', labRequest);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllLabTests,
   getLabTestById,
   createLabTest,
   updateLabTest,
-  deleteLabTest
+  deleteLabTest,
+  getLabDashboard,
+  getLabRequests,
+  getLabRequestById
 };

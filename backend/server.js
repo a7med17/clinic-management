@@ -97,6 +97,7 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/medicines', pharmacyRoutes);
 app.use('/api/lab-tests', labRoutes);
+app.use('/api/lab', labRoutes.labQueueRouter);
 
 // Convert unmatched requests into the same error flow used by controllers.
 app.use((req, res, next) => {
