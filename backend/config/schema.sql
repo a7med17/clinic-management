@@ -93,8 +93,8 @@ CREATE TABLE appointments (
     patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
     doctor_id UUID NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
     appointment_date DATE NOT NULL,
-    start_time TIME,
-    end_time TIME,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
     status VARCHAR(50) DEFAULT 'Pending' CHECK (
         status IN (
             'Pending',
@@ -109,13 +109,14 @@ CREATE TABLE appointments (
     notes TEXT,
     doctor_notes TEXT,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_appointment_end_after_start CHECK (end_time > start_time)
 );
 
 -- Prevent double booking: only one non-cancelled appointment per doctor per timeslot
 CREATE UNIQUE INDEX unique_doctor_timeslot
 ON appointments (doctor_id, appointment_date, start_time)
-WHERE status <> 'Cancelled' AND start_time IS NOT NULL;
+WHERE status <> 'Cancelled';
 
 -- ==========================================
 -- INVOICES
@@ -257,11 +258,14 @@ CREATE TABLE lab_request_tests (
 
 CREATE TABLE lab_results (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    lab_request_id UUID NOT NULL REFERENCES lab_requests(id) ON DELETE CASCADE,
     lab_request_test_id UUID NOT NULL REFERENCES lab_request_tests(id) ON DELETE CASCADE,
     result_value TEXT,
     unit VARCHAR(50),
     reference_range VARCHAR(100),
-    abnormal_flag BOOLEAN DEFAULT FALSE,
+    abnormal_flag VARCHAR(20) DEFAULT 'Normal' CHECK (
+        abnormal_flag IN ('Low', 'Normal', 'High', 'Critical', 'Abnormal')
+    ),
     comments TEXT,
     status VARCHAR(20) DEFAULT 'Draft' CHECK (
         status IN ('Draft', 'Completed', 'Verified', 'Released')
@@ -356,6 +360,7 @@ CREATE INDEX idx_lab_request_tests_status ON lab_request_tests(status);
 CREATE INDEX idx_lab_request_tests_priority ON lab_request_tests(priority);
 
 -- Lab results
+CREATE INDEX idx_lab_results_request_id ON lab_results(lab_request_id);
 CREATE INDEX idx_lab_results_test_id ON lab_results(lab_request_test_id);
 CREATE INDEX idx_lab_results_status ON lab_results(status);
 CREATE INDEX idx_lab_results_entered_by ON lab_results(entered_by);
@@ -372,3 +377,39 @@ CREATE INDEX idx_audit_logs_table_name ON audit_logs(table_name);
 
 ALTER TABLE doctors ADD CONSTRAINT doctors_email_unique UNIQUE (email);
 ALTER TABLE patients ADD CONSTRAINT patients_email_unique UNIQUE (email);
+
+-- ==========================================
+-- UPDATED_AT TRIGGERS
+-- ==========================================
+
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_patients_updated_at BEFORE UPDATE ON patients
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_doctors_updated_at BEFORE UPDATE ON doctors
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_appointments_updated_at BEFORE UPDATE ON appointments
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_invoices_updated_at BEFORE UPDATE ON invoices
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_prescriptions_updated_at BEFORE UPDATE ON prescriptions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_lab_requests_updated_at BEFORE UPDATE ON lab_requests
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_lab_results_updated_at BEFORE UPDATE ON lab_results
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
