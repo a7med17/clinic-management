@@ -697,7 +697,7 @@ const saveLabRequest = async (req, res, next) => {
 
     if (requestId) {
       await supabase.from('lab_requests').update({ notes, updated_at: new Date().toISOString() }).eq('id', requestId);
-      await supabase.from('lab_request_tests').delete().eq('request_id', requestId);
+      await supabase.from('lab_request_tests').delete().eq('lab_request_id', requestId);
     } else {
       const { data: created, error: createError } = await supabase
         .from('lab_requests')
@@ -709,7 +709,7 @@ const saveLabRequest = async (req, res, next) => {
     }
 
     const rows = tests.map((test) => ({
-      request_id: requestId,
+      lab_request_id: requestId,
       test_name: test.test_name.trim(),
       priority: PRIORITIES.includes(test.priority) ? test.priority : 'Routine',
       clinical_notes: (test.clinical_notes || '').trim(),

@@ -196,6 +196,8 @@ const createAppointment = async (req, res, next) => {
         patient_id,
         doctor_id,
         appointment_date: slot.date,
+        start_time,
+        end_time,
         status: 'Pending',
         notes: notes || null
       })
@@ -288,6 +290,8 @@ const updateAppointment = async (req, res, next) => {
       });
       if (!slot.ok) return errorResponse(res, slot.message, slot.status, slot.detail);
       updateData.appointment_date = slot.date;
+      updateData.start_time = req.body.start_time;
+      updateData.end_time = req.body.end_time;
     }
 
     const { data: updatedAppointment, error } = await supabase
