@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getLabRequest, LabRequestDetail } from '../../services/labService';
+import { getLabRequest, startProcessing, cancelRequest, LabRequestDetail } from '../../services/labService';
 import { Content, Screen, SectionHeader, colors } from '../../ui/ClinicComponents';
 
 const computeAge = (dob?: string) => {
@@ -61,6 +61,11 @@ export default function LabRequestDetailScreen({ navigation, route }: any) {
   const [item, setItem] = useState<LabRequestDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionError, setActionError] = useState(false);
+  const [showCancelInput, setShowCancelInput] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   const load = async () => {
     try {
@@ -72,6 +77,40 @@ export default function LabRequestDetailScreen({ navigation, route }: any) {
       setError(err.response?.data?.message || 'Unable to load lab request.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStartProcessing = async () => {
+    try {
+      setActionLoading(true);
+      setActionMessage('');
+      setActionError(false);
+      const updated = await startProcessing(requestId);
+      setItem(updated);
+      setActionMessage('Processing started.');
+    } catch (err: any) {
+      setActionError(true);
+      setActionMessage(err.response?.data?.message || 'Unable to start processing.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    try {
+      setActionLoading(true);
+      setActionMessage('');
+      setActionError(false);
+      const updated = await cancelRequest(requestId, cancelReason.trim() || undefined);
+      setItem(updated);
+      setShowCancelInput(false);
+      setCancelReason('');
+      setActionMessage('Request cancelled.');
+    } catch (err: any) {
+      setActionError(true);
+      setActionMessage(err.response?.data?.message || 'Unable to cancel request.');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -169,6 +208,60 @@ export default function LabRequestDetailScreen({ navigation, route }: any) {
             </View>
           ))
         )}
+
+        {item.status === 'Submitted' ? (
+          <View style={{ marginTop: 20, gap: 12 }}>
+            {actionMessage ? (
+              <View style={{ padding: 12, borderRadius: 12, backgroundColor: actionError ? `${colors.red}12` : `${colors.green}12` }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: actionError ? colors.red : colors.green }}>{actionMessage}</Text>
+              </View>
+            ) : null}
+
+            {showCancelInput ? (
+              <View>
+                <TextInput
+                  placeholder="Cancellation reason (optional)"
+                  placeholderTextColor="#8b97a8"
+                  value={cancelReason}
+                  onChangeText={setCancelReason}
+                  style={{ height: 54, backgroundColor: colors.surface, borderRadius: 16, paddingHorizontal: 16, borderWidth: 1, borderColor: colors.line, fontSize: 14, color: colors.ink, marginBottom: 12 }}
+                />
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity
+                    onPress={() => { setShowCancelInput(false); setCancelReason(''); setActionMessage(''); }}
+                    style={{ flex: 1, height: 50, borderRadius: 16, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: colors.muted }}>Back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleCancel}
+                    disabled={actionLoading}
+                    style={{ flex: 1, height: 50, borderRadius: 16, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    {actionLoading ? <ActivityIndicator color="#fff" /> : <Text style={{ fontSize: 14, fontWeight: '800', color: '#fff' }}>Confirm Cancel</Text>}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity
+                  onPress={handleStartProcessing}
+                  disabled={actionLoading}
+                  style={{ flex: 1, height: 50, borderRadius: 16, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  {actionLoading ? <ActivityIndicator color="#fff" /> : <Text style={{ fontSize: 14, fontWeight: '800', color: '#fff' }}>Start Processing</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setShowCancelInput(true)}
+                  disabled={actionLoading}
+                  style={{ flex: 1, height: 50, borderRadius: 16, borderWidth: 1, borderColor: colors.red, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: colors.red }}>Cancel Request</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        ) : null}
       </Content>
     </Screen>
   );

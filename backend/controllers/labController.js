@@ -425,11 +425,149 @@ const getLabRequestById = async (req, res, next) => {
       return errorResponse(res, 'Lab request not found.', 404);
     }
 
-    if (labRequest.status !== 'Submitted') {
+    return successResponse(res, 'Lab request retrieved successfully', labRequest);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PATCH /api/lab/requests/:id/start-processing
+ * Start processing a submitted lab request (changes Pending tests to Processing).
+ */
+const startProcessingLabRequest = async (req, res, next) => {
+  try {
+    if (!supabase) {
+      return errorResponse(res, 'Database is not configured.', 503);
+    }
+
+    const { data: labRequest, error: fetchError } = await supabase
+      .from('lab_requests')
+      .select('id, status')
+      .eq('id', req.params.id)
+      .single();
+
+    if (fetchError || !labRequest) {
       return errorResponse(res, 'Lab request not found.', 404);
     }
 
-    return successResponse(res, 'Lab request retrieved successfully', labRequest);
+    if (labRequest.status !== 'Submitted') {
+      return errorResponse(res, 'Only submitted lab requests can be processed.', 400);
+    }
+
+    // Update all pending test items to Processing
+    const { error: updateError } = await supabase
+      .from('lab_request_tests')
+      .update({ status: 'Processing' })
+      .eq('lab_request_id', req.params.id)
+      .eq('status', 'Pending');
+
+    if (updateError) {
+      console.error('[LAB QUEUE] Start processing error:', updateError.message);
+      return errorResponse(res, 'Failed to start processing lab request.', 500);
+    }
+
+    // Audit log
+    await supabase.from('audit_logs').insert({
+      user_id: req.user.id,
+      action: `START_PROCESSING_LAB_REQUEST: ${req.params.id}`,
+      table_name: 'lab_requests'
+    });
+
+    // Return updated request
+    const { data: updated } = await supabase
+      .from('lab_requests')
+      .select(`
+        id, status, notes, created_at, updated_at, appointment_id, patient_id, doctor_id,
+        appointments:appointment_id ( id, appointment_date, status ),
+        patients:patient_id ( id, name ),
+        doctors:doctor_id ( id, name ),
+        lab_request_tests:lab_request_tests ( id, test_name, priority, status, clinical_notes, created_at )
+      `)
+      .eq('id', req.params.id)
+      .single();
+
+    return successResponse(res, 'Lab request processing started.', updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PATCH /api/lab/requests/:id/cancel
+ * Cancel a submitted lab request.
+ */
+const cancelLabRequest = async (req, res, next) => {
+  try {
+    if (!supabase) {
+      return errorResponse(res, 'Database is not configured.', 503);
+    }
+
+    const { cancellation_reason } = req.body;
+
+    const { data: labRequest, error: fetchError } = await supabase
+      .from('lab_requests')
+      .select('id, status')
+      .eq('id', req.params.id)
+      .single();
+
+    if (fetchError || !labRequest) {
+      return errorResponse(res, 'Lab request not found.', 404);
+    }
+
+    if (labRequest.status !== 'Submitted') {
+      return errorResponse(res, 'Only submitted lab requests can be cancelled.', 400);
+    }
+
+    // Update the lab request status and cancellation reason
+    const updates = { status: 'Cancelled' };
+    if (cancellation_reason !== undefined) {
+      updates.cancellation_reason = cancellation_reason;
+    }
+
+    const { error: reqUpdateError } = await supabase
+      .from('lab_requests')
+      .update(updates)
+      .eq('id', req.params.id);
+
+    if (reqUpdateError) {
+      console.error('[LAB QUEUE] Cancel request error:', reqUpdateError.message);
+      return errorResponse(res, 'Failed to cancel lab request.', 500);
+    }
+
+    // Cancel all pending/processing test items
+    const { error: testUpdateError } = await supabase
+      .from('lab_request_tests')
+      .update({ status: 'Cancelled' })
+      .eq('lab_request_id', req.params.id)
+      .in('status', ['Pending', 'Processing']);
+
+    if (testUpdateError) {
+      console.error('[LAB QUEUE] Cancel tests error:', testUpdateError.message);
+      return errorResponse(res, 'Failed to cancel lab request tests.', 500);
+    }
+
+    // Audit log
+    await supabase.from('audit_logs').insert({
+      user_id: req.user.id,
+      action: `CANCEL_LAB_REQUEST: ${req.params.id}${cancellation_reason ? ` - ${cancellation_reason}` : ''}`,
+      table_name: 'lab_requests'
+    });
+
+    // Return updated request
+    const { data: updated } = await supabase
+      .from('lab_requests')
+      .select(`
+        id, status, notes, created_at, updated_at, appointment_id, patient_id, doctor_id,
+        appointments:appointment_id ( id, appointment_date, status ),
+        patients:patient_id ( id, name ),
+        doctors:doctor_id ( id, name ),
+        lab_request_tests:lab_request_tests ( id, test_name, priority, status, clinical_notes, created_at )
+      `)
+      .eq('id', req.params.id)
+      .single();
+
+    return successResponse(res, 'Lab request cancelled.', updated);
   } catch (error) {
     next(error);
   }
@@ -443,5 +581,7 @@ module.exports = {
   deleteLabTest,
   getLabDashboard,
   getLabRequests,
-  getLabRequestById
+  getLabRequestById,
+  startProcessingLabRequest,
+  cancelLabRequest
 };

@@ -10,7 +10,9 @@ const {
   deleteLabTest,
   getLabDashboard,
   getLabRequests,
-  getLabRequestById
+  getLabRequestById,
+  startProcessingLabRequest,
+  cancelLabRequest
 } = require('../controllers/labController');
 
 const router = express.Router();
@@ -80,6 +82,20 @@ labQueueRouter.get('/requests', roleMiddleware(['Laboratory Staff']), getLabRequ
  * @access  Laboratory Staff
  */
 labQueueRouter.get('/requests/:id', roleMiddleware(['Laboratory Staff']), getLabRequestById);
+
+/**
+ * @route   PATCH /api/lab/requests/:id/start-processing
+ * @desc    Start processing a submitted lab request
+ * @access  Laboratory Staff
+ */
+labQueueRouter.patch('/requests/:id/start-processing', roleMiddleware(['Laboratory Staff']), startProcessingLabRequest);
+
+/**
+ * @route   PATCH /api/lab/requests/:id/cancel
+ * @desc    Cancel a submitted lab request
+ * @access  Laboratory Staff
+ */
+labQueueRouter.patch('/requests/:id/cancel', roleMiddleware(['Laboratory Staff']), cancelLabRequest);
 
 module.exports = router;
 module.exports.labQueueRouter = labQueueRouter;

@@ -79,3 +79,9 @@ export const getLabRequests = async (): Promise<LabRequestRecord[]> =>
 
 export const getLabRequest = async (id: string): Promise<LabRequestDetail> =>
   unwrap(await api.get(`/lab/requests/${id}`));
+
+export const startProcessing = async (id: string): Promise<LabRequestDetail> =>
+  unwrap(await api.patch(`/lab/requests/${id}/start-processing`));
+
+export const cancelRequest = async (id: string, cancellation_reason?: string): Promise<LabRequestDetail> =>
+  unwrap(await api.patch(`/lab/requests/${id}/cancel`, { cancellation_reason }));
