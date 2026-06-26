@@ -13,6 +13,9 @@ import ConsultationHistoryScreen from '../screens/doctor/ConsultationHistoryScre
 import DoctorConsultationScreen from '../screens/doctor/DoctorConsultationScreen';
 import LabRequestScreen from '../screens/doctor/LabRequestScreen';
 import PrescriptionScreen from '../screens/doctor/PrescriptionScreen';
+import LabDashboardScreen from '../screens/lab/LabDashboardScreen';
+import LabQueueScreen from '../screens/lab/LabQueueScreen';
+import LabRequestDetailScreen from '../screens/lab/LabRequestDetailScreen';
 import {
   ManagementScreen,
   ModuleDetailScreen,
@@ -91,9 +94,8 @@ const ROLE_TABS: Record<Role, TabConfig[]> = {
     { name: 'Profile', label: 'Profile', icon: 'person-outline', component: ProfileScreen },
   ],
   'Laboratory Staff': [
-    { name: 'Dashboard', label: 'Dashboard', icon: 'grid-outline', component: RoleDashboardScreen },
-    { name: 'Tests', label: 'Tests', icon: 'flask-outline', component: RoleListScreen },
-    { name: 'Results', label: 'Results', icon: 'document-attach-outline', component: RoleListScreen },
+    { name: 'Dashboard', label: 'Dashboard', icon: 'grid-outline', component: LabDashboardScreen },
+    { name: 'Queue', label: 'Queue', icon: 'flask-outline', component: LabQueueScreen },
     { name: 'Profile', label: 'Profile', icon: 'person-outline', component: ProfileScreen },
   ],
 };
@@ -198,6 +200,7 @@ export default function AppNavigator() {
             <Stack.Screen name="PatientDetails" component={PatientDetailsScreen} />
             <Stack.Screen name="DoctorLabRequest" component={LabRequestScreen} />
             <Stack.Screen name="DoctorPrescription" component={PrescriptionScreen} />
+            <Stack.Screen name="LabRequestDetail" component={LabRequestDetailScreen} />
             <Stack.Screen name="ModuleDetail" component={ModuleDetailScreen} />
           </>
         )}

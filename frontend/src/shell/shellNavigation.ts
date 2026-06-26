@@ -36,6 +36,7 @@ const ROOT_STACK_ROUTES = [
   'DoctorPatientDetail',
   'DoctorLabTests',
   'DoctorPrescription',
+  'LabRequestDetail',
   'PatientBookAppointment',
   'PatientLabResults',
   'ReceptionPatientForm',
@@ -52,7 +53,7 @@ const ROLE_TAB_ROUTES: Record<Role, readonly string[]> = {
   Patient: ['Home', 'Appointments', 'Records', 'Profile'],
   Receptionist: ['Dashboard', 'Patients', 'Appointments', 'Billing', 'Profile'],
   Pharmacist: ['Dashboard', 'Inventory', 'Medicines', 'Alerts', 'Profile'],
-  'Laboratory Staff': ['Dashboard', 'Tests', 'Results', 'Profile'],
+  'Laboratory Staff': ['Dashboard', 'Queue', 'Profile'],
 };
 
 const warnedShellTargets = new Set<string>();
