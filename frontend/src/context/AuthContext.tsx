@@ -65,8 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const response = await loginRequest(email, password);
-    if (response.success) {
-      setSession(await getSession());
+    if (response.success && response.token && response.user) {
+      setSession({ accessToken: response.token, user: response.user });
     }
     return response;
   }, []);
