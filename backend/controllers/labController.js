@@ -573,6 +573,223 @@ const cancelLabRequest = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/lab/requests/:id/results
+ * Get existing lab results for a request.
+ */
+const getLabResults = async (req, res, next) => {
+  try {
+    if (!supabase) return errorResponse(res, 'Database is not configured.', 503);
+
+    const { id } = req.params;
+
+    const { data: labRequest, error: fetchError } = await supabase
+      .from('lab_requests')
+      .select('id, status')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !labRequest) {
+      return errorResponse(res, 'Lab request not found.', 404);
+    }
+
+    const { data: results, error } = await supabase
+      .from('lab_results')
+      .select(`
+        *,
+        lab_request_tests:lab_request_test_id ( id, test_name, priority, clinical_notes )
+      `)
+      .eq('lab_request_id', id)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('[LAB] Fetch results error:', error.message);
+      return errorResponse(res, 'Failed to retrieve lab results.', 500);
+    }
+
+    return successResponse(res, 'Lab results retrieved successfully', results);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/lab/requests/:id/results
+ * Save/draft lab results (upserts on lab_request_id + lab_request_test_id).
+ */
+const saveLabResults = async (req, res, next) => {
+  try {
+    if (!supabase) return errorResponse(res, 'Database is not configured.', 503);
+
+    const { id } = req.params;
+    const { results } = req.body;
+
+    if (!Array.isArray(results) || results.length === 0) {
+      return errorResponse(res, 'Results array is required.', 400);
+    }
+
+    const { data: labRequest, error: fetchError } = await supabase
+      .from('lab_requests')
+      .select('id, status')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !labRequest) {
+      return errorResponse(res, 'Lab request not found.', 404);
+    }
+
+    if (labRequest.status !== 'Processing') {
+      return errorResponse(res, 'Results can only be entered for processing lab requests.', 400);
+    }
+
+    // Validate that all lab_request_test_ids belong to this request
+    const { data: validTests } = await supabase
+      .from('lab_request_tests')
+      .select('id')
+      .eq('lab_request_id', id);
+
+    const validIds = new Set((validTests || []).map(t => t.id));
+
+    for (const item of results) {
+      if (!validIds.has(item.lab_request_test_id)) {
+        return errorResponse(res, `Invalid lab_request_test_id: ${item.lab_request_test_id}`, 400);
+      }
+    }
+
+    const saved = [];
+
+    for (const item of results) {
+      const { lab_request_test_id, result_value, unit, reference_range, abnormal_flag, comments } = item;
+
+      const { data: existing } = await supabase
+        .from('lab_results')
+        .select('id')
+        .eq('lab_request_id', id)
+        .eq('lab_request_test_id', lab_request_test_id)
+        .maybeSingle();
+
+      if (existing) {
+        const { data: updated, error: updateErr } = await supabase
+          .from('lab_results')
+          .update({
+            result_value: result_value || null,
+            unit: unit || null,
+            reference_range: reference_range || null,
+            abnormal_flag: abnormal_flag || null,
+            comments: comments || null,
+            status: 'Draft'
+          })
+          .eq('id', existing.id)
+          .select()
+          .single();
+
+        if (updateErr) {
+          console.error('[LAB] Update result error:', updateErr.message);
+          continue;
+        }
+        saved.push(updated);
+      } else {
+        const { data: inserted, error: insertErr } = await supabase
+          .from('lab_results')
+          .insert({
+            lab_request_id: id,
+            lab_request_test_id,
+            result_value: result_value || null,
+            unit: unit || null,
+            reference_range: reference_range || null,
+            abnormal_flag: abnormal_flag || null,
+            comments: comments || null,
+            entered_by: req.user.id,
+            status: 'Draft'
+          })
+          .select()
+          .single();
+
+        if (insertErr) {
+          console.error('[LAB] Insert result error:', insertErr.message);
+          continue;
+        }
+        saved.push(inserted);
+      }
+    }
+
+    return successResponse(res, 'Results saved successfully', saved);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PATCH /api/lab/requests/:id/results/complete
+ * Complete all draft results and transition request to Completed if all tests have results.
+ */
+const completeLabResults = async (req, res, next) => {
+  try {
+    if (!supabase) return errorResponse(res, 'Database is not configured.', 503);
+
+    const { id } = req.params;
+
+    const { data: labRequest, error: fetchError } = await supabase
+      .from('lab_requests')
+      .select('id, status')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !labRequest) {
+      return errorResponse(res, 'Lab request not found.', 404);
+    }
+
+    if (labRequest.status !== 'Processing') {
+      return errorResponse(res, 'Results can only be completed for processing lab requests.', 400);
+    }
+
+    // Transition all Draft results to Completed
+    const { error: updateError } = await supabase
+      .from('lab_results')
+      .update({ status: 'Completed' })
+      .eq('lab_request_id', id)
+      .eq('status', 'Draft');
+
+    if (updateError) {
+      console.error('[LAB] Complete results error:', updateError.message);
+      return errorResponse(res, 'Failed to complete lab results.', 500);
+    }
+
+    // Check if all requested tests have completed results
+    const { data: allTests } = await supabase
+      .from('lab_request_tests')
+      .select('id')
+      .eq('lab_request_id', id);
+
+    const { data: completedResults } = await supabase
+      .from('lab_results')
+      .select('lab_request_test_id')
+      .eq('lab_request_id', id)
+      .eq('status', 'Completed');
+
+    const completedTestIds = new Set((completedResults || []).map(r => r.lab_request_test_id));
+    const allCompleted = (allTests || []).length > 0 && (allTests || []).every(test => completedTestIds.has(test.id));
+
+    if (allCompleted) {
+      await supabase
+        .from('lab_requests')
+        .update({ status: 'Completed' })
+        .eq('id', id);
+    }
+
+    // Audit log
+    await supabase.from('audit_logs').insert({
+      user_id: req.user.id,
+      action: `COMPLETE_LAB_RESULTS: ${id}`,
+      table_name: 'lab_results'
+    });
+
+    return successResponse(res, 'Lab results completed successfully.', { all_tests_completed: allCompleted });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllLabTests,
   getLabTestById,
@@ -583,5 +800,8 @@ module.exports = {
   getLabRequests,
   getLabRequestById,
   startProcessingLabRequest,
-  cancelLabRequest
+  cancelLabRequest,
+  getLabResults,
+  saveLabResults,
+  completeLabResults
 };

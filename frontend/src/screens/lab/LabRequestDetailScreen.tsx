@@ -262,6 +262,17 @@ export default function LabRequestDetailScreen({ navigation, route }: any) {
             )}
           </View>
         ) : null}
+
+        {item.status === 'Processing' ? (
+          <View style={{ marginTop: 20 }}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('LabResultEntry', { requestId })}
+              style={{ height: 52, borderRadius: 16, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#fff' }}>Enter Results</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
       </Content>
     </Screen>
   );

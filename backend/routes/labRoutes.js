@@ -12,7 +12,10 @@ const {
   getLabRequests,
   getLabRequestById,
   startProcessingLabRequest,
-  cancelLabRequest
+  cancelLabRequest,
+  getLabResults,
+  saveLabResults,
+  completeLabResults
 } = require('../controllers/labController');
 
 const router = express.Router();
@@ -96,6 +99,27 @@ labQueueRouter.patch('/requests/:id/start-processing', roleMiddleware(['Laborato
  * @access  Laboratory Staff
  */
 labQueueRouter.patch('/requests/:id/cancel', roleMiddleware(['Laboratory Staff']), cancelLabRequest);
+
+/**
+ * @route   GET /api/lab/requests/:id/results
+ * @desc    Get existing lab results for a request
+ * @access  Laboratory Staff, Admin
+ */
+labQueueRouter.get('/requests/:id/results', roleMiddleware(['Laboratory Staff', 'Admin']), getLabResults);
+
+/**
+ * @route   POST /api/lab/requests/:id/results
+ * @desc    Save/draft lab results (upserts on lab_request_id + lab_request_test_id)
+ * @access  Laboratory Staff, Admin
+ */
+labQueueRouter.post('/requests/:id/results', roleMiddleware(['Laboratory Staff', 'Admin']), saveLabResults);
+
+/**
+ * @route   PATCH /api/lab/requests/:id/results/complete
+ * @desc    Complete all draft results and transition request to Completed if all tests have results
+ * @access  Laboratory Staff, Admin
+ */
+labQueueRouter.patch('/requests/:id/results/complete', roleMiddleware(['Laboratory Staff', 'Admin']), completeLabResults);
 
 module.exports = router;
 module.exports.labQueueRouter = labQueueRouter;

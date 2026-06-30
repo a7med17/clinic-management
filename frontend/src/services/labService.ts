@@ -85,3 +85,28 @@ export const startProcessing = async (id: string): Promise<LabRequestDetail> =>
 
 export const cancelRequest = async (id: string, cancellation_reason?: string): Promise<LabRequestDetail> =>
   unwrap(await api.patch(`/lab/requests/${id}/cancel`, { cancellation_reason }));
+
+export interface LabResult {
+  id: string;
+  lab_request_id: string;
+  lab_request_test_id: string;
+  result_value?: string;
+  unit?: string;
+  reference_range?: string;
+  abnormal_flag?: string;
+  comments?: string;
+  entered_by?: string;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+  lab_request_tests?: { id: string; test_name: string; priority: string; clinical_notes?: string };
+}
+
+export const getResults = async (requestId: string): Promise<LabResult[]> =>
+  unwrap(await api.get(`/lab/requests/${requestId}/results`));
+
+export const saveResults = async (requestId: string, results: Partial<LabResult>[]): Promise<LabResult[]> =>
+  unwrap(await api.post(`/lab/requests/${requestId}/results`, { results }));
+
+export const completeResults = async (requestId: string): Promise<{ all_tests_completed: boolean }> =>
+  unwrap(await api.patch(`/lab/requests/${requestId}/results/complete`));

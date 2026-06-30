@@ -16,6 +16,7 @@ import PrescriptionScreen from '../screens/doctor/PrescriptionScreen';
 import LabDashboardScreen from '../screens/lab/LabDashboardScreen';
 import LabQueueScreen from '../screens/lab/LabQueueScreen';
 import LabRequestDetailScreen from '../screens/lab/LabRequestDetailScreen';
+import LabResultEntryScreen from '../screens/lab/LabResultEntryScreen';
 import {
   ManagementScreen,
   ModuleDetailScreen,
@@ -199,6 +200,7 @@ function AuthenticatedStack({ user }: { user: NonNullable<ReturnType<typeof useA
       <Stack.Screen name="DoctorLabRequest" component={LabRequestScreen} />
       <Stack.Screen name="DoctorPrescription" component={PrescriptionScreen} />
       <Stack.Screen name="LabRequestDetail" component={LabRequestDetailScreen} />
+      <Stack.Screen name="LabResultEntry" component={LabResultEntryScreen} />
       <Stack.Screen name="ModuleDetail" component={ModuleDetailScreen} />
     </Stack.Navigator>
   );
